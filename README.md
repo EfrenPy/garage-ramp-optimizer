@@ -3,6 +3,7 @@
 [![Latest release](https://img.shields.io/github/v/release/EfrenPy/garage-ramp-optimizer?display_name=tag&sort=semver)](https://github.com/EfrenPy/garage-ramp-optimizer/releases/latest)
 [![CI](https://github.com/EfrenPy/garage-ramp-optimizer/actions/workflows/ci.yml/badge.svg)](https://github.com/EfrenPy/garage-ramp-optimizer/actions/workflows/ci.yml)
 [![Release build](https://github.com/EfrenPy/garage-ramp-optimizer/actions/workflows/release.yml/badge.svg)](https://github.com/EfrenPy/garage-ramp-optimizer/actions/workflows/release.yml)
+[![codecov](https://codecov.io/gh/EfrenPy/garage-ramp-optimizer/branch/main/graph/badge.svg)](https://codecov.io/gh/EfrenPy/garage-ramp-optimizer)
 [![License: MIT](https://img.shields.io/github/license/EfrenPy/garage-ramp-optimizer)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/downloads/)
 [![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
