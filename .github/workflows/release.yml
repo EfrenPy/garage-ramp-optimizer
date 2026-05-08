@@ -56,7 +56,7 @@ jobs:
           echo "value=$TAG" >> "$GITHUB_OUTPUT"
           echo "Building tag: $TAG"
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ steps.tag.outputs.value }}
 
@@ -100,7 +100,7 @@ jobs:
           TAG="${{ inputs.tag || github.event.inputs.tag || github.ref_name }}"
           echo "value=$TAG" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ steps.tag.outputs.value }}
 
