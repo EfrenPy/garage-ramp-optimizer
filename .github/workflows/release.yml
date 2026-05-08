@@ -1,0 +1,121 @@
+name: Release
+
+# Builds Windows executables (English + Spanish) on every `v*` tag push
+# and publishes them as a GitHub Release.  Can also be triggered
+# manually from the Actions tab.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to publish (e.g. v0.1.0). Required for manual run."
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows-exe:
+    name: Build Windows .exe (${{ matrix.label }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - lang: en
+            label: English
+            extra_args: ""
+            outname: rampa-en.exe
+          - lang: es
+            label: Spanish
+            extra_args: "--spanish"
+            outname: rampa-es.exe
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install numpy scipy matplotlib pyinstaller
+
+      - name: Build executable (${{ matrix.label }})
+        run: python build_exe.py ${{ matrix.extra_args }}
+
+      - name: Rename and verify executable
+        shell: pwsh
+        run: |
+          Copy-Item dist/rampa.exe ${{ matrix.outname }}
+          Get-ChildItem ${{ matrix.outname }} | Format-List Length, Name
+
+      - name: Upload as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.outname }}
+          path: ${{ matrix.outname }}
+          if-no-files-found: error
+          retention-days: 7
+
+  publish-release:
+    name: Publish GitHub Release
+    needs: build-windows-exe
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: List collected files
+        run: ls -la artifacts/
+
+      - name: Create / update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          name: ${{ github.event.inputs.tag || github.ref_name }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+          files: |
+            artifacts/rampa-en.exe
+            artifacts/rampa-es.exe
+          body: |
+            Pre-built Windows executables for the **garage ramp optimizer**.
+
+            | File | UI language | Notes |
+            |---|---|---|
+            | `rampa-en.exe` | English | default |
+            | `rampa-es.exe` | Spanish | the GUI, console output and blueprints are in Spanish |
+
+            ### How to use
+
+            1. Download one of the executables above.
+            2. Double-click it. The GUI opens — fill in the rise, run
+               and (if you want) the car parameters, then click
+               **Calculate and generate blueprints**.
+            3. The PNG / PDF blueprints and the CSV tables land in the
+               folder you pick (next to the `.exe` by default).
+
+            See [`README.md`](https://github.com/EfrenPy/garage-ramp-optimizer#readme)
+            for the full guide and
+            [`COMPILAR.md`](https://github.com/EfrenPy/garage-ramp-optimizer/blob/main/COMPILAR.md)
+            if you want to build the executable yourself.
+
+            ### Antivirus note
+
+            Some antiviruses flag any uncommon `.exe` by reputation.
+            Workarounds: add the file to your antivirus' exclusion
+            list, or run the Python script directly without
+            compiling — see [`CONTRIBUTING.md`](https://github.com/EfrenPy/garage-ramp-optimizer/blob/main/CONTRIBUTING.md).
