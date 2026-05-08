@@ -522,6 +522,12 @@ _TRANSLATIONS_ES: "dict[str, str]" = {
     # Smooth-blueprint specifics.
     "Continuous curve: mark a station every {step:.0f} cm along the wall and measure the indicated drop.":
         "Curva continua: marcar una estacion cada {step:.0f} cm a lo largo del muro y medir la bajada indicada.",
+    "Continuous curve: mark a station every {step:.0f} cm along the garage floor from the start of the ramp; for each station measure y vertically.":
+        "Curva continua: marcar una estacion cada {step:.0f} cm a lo largo del suelo del garaje desde el inicio de la rampa; para cada estacion medir y en vertical.",
+    "start station (at the garage)":
+        "estacion inicial (en el garaje)",
+    "end station (at the street)":
+        "estacion final (en la calle)",
     "Curve control points (informative):":
         "Puntos de control de la curva (informativo):",
     "upper station (by the street)":

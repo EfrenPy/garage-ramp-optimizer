@@ -1877,6 +1877,188 @@ def chord_coords(ramp: Ramp, x_arr, y_arr):
     return s, p
 
 
+def draw_smooth_blueprint_groundref(
+    ramp: Ramp,
+    x_curve, y_curve,
+    ctrl_x, ctrl_y,
+    color: str = "tab:orange",
+    station_step_cm: float = 30.0,
+    label: str = "free-form smooth curve",
+    path: str = "ramp_blueprint_smooth.png",
+):
+    """Floor-reference worker blueprint for the smooth profile.
+
+    Mirror of draw_smooth_blueprint_topref but in the (x, y) frame
+    used by draw_three_slope_blueprint:
+
+      origin (0, 0) = start of the ramp on the garage floor
+      x  = horizontal distance from the origin (cm)
+      y  = height above the garage floor (cm)
+
+    Stations are marked every ``station_step_cm`` along x; for each one
+    the corresponding y is read off the spline and shown both on the
+    plot and in a measurements table at the bottom.
+
+    The companion CSV is written by compute_and_save (n, x, y triples).
+    """
+    if not HAS_PLT:
+        return
+
+    # Stations every station_step_cm along x, from 0 to run.
+    n_stations = int(math.floor(ramp.run / station_step_cm)) + 1
+    xs = np.arange(n_stations + 1, dtype=float) * station_step_cm
+    xs = xs[xs <= ramp.run - 0.5]
+    xs = np.unique(np.concatenate([[0.0], xs, [ramp.run]]))
+    ys = np.interp(xs, x_curve, y_curve)
+
+    fig = plt.figure(figsize=(22, 17))
+    gs = fig.add_gridspec(
+        2, 1, left=0.06, right=0.98, top=0.95, bottom=0.30,
+        hspace=0.30, height_ratios=[1.0, 4.4],
+    )
+    ax_true = fig.add_subplot(gs[0, 0])
+    ax = fig.add_subplot(gs[1, 0])
+
+    # ---- Top: true-scale overview --------------------------------------- #
+    ax_true.plot([-150, 0], [0, 0], "k-", linewidth=2.0)
+    ax_true.plot([ramp.run, ramp.run + 150], [ramp.rise, ramp.rise],
+                 "k-", linewidth=2.0)
+    ax_true.plot(x_curve, y_curve, "-", color=color, linewidth=2.6)
+    ax_true.set_aspect("equal")
+    ax_true.set_xticks(np.arange(-150, ramp.run + 151, 100))
+    ax_true.set_yticks(np.arange(0, ramp.rise + 31, 50))
+    ax_true.grid(True, alpha=0.4)
+    ax_true.set_xlim(-160, ramp.run + 160)
+    ax_true.set_ylim(-15, ramp.rise + 35)
+    ax_true.set_title(
+        t("True-scale view (1 cm vertical = 1 cm horizontal)"),
+        fontsize=11,
+    )
+    ax_true.set_xlabel("x (cm)")
+    ax_true.set_ylabel("y (cm)")
+
+    # ---- Working drawing (vertical stretched) --------------------------- #
+    head = t(
+        "Continuous curve: mark a station every {step:.0f} cm along the "
+        "garage floor from the start of the ramp; for each station "
+        "measure y vertically."
+    ).format(step=station_step_cm)
+    ax.text(
+        0.5, 0.985, head, transform=ax.transAxes,
+        ha="center", va="top",
+        fontsize=11, fontweight="bold",
+        bbox=dict(boxstyle="round,pad=0.45", facecolor="lightcyan",
+                  edgecolor="steelblue", alpha=0.95),
+    )
+
+    ax.plot([-150, 0], [0, 0], "k-", linewidth=2.5)
+    ax.plot([ramp.run, ramp.run + 150], [ramp.rise, ramp.rise],
+            "k-", linewidth=2.5)
+    ax.plot(x_curve, y_curve, "-", color=color, linewidth=3.0,
+            label=t("Ramp profile to build"))
+
+    # Control points as small white diamonds for context.
+    ax.scatter(np.asarray(ctrl_x), np.asarray(ctrl_y),
+               s=80, marker="D", facecolor="white",
+               edgecolor=color, linewidth=1.4, zorder=5,
+               label=t("Curve control points"))
+
+    # Station marks + alternating labels.
+    for n, (xi, yi) in enumerate(zip(xs, ys), start=1):
+        ax.plot([xi, xi], [0, yi], color="lightgray",
+                linestyle=":", linewidth=0.8, alpha=0.7)
+        ax.scatter([xi], [yi], s=70, marker="o",
+                   facecolor=color, edgecolor="black",
+                   linewidth=1.0, zorder=6)
+        above = (n % 2 == 1)
+        slot_dy = 14 if above else -14
+        ax.annotate(
+            f"{n}\n({xi:.0f}, {yi:.1f})",
+            xy=(xi, yi),
+            xytext=(xi, yi + slot_dy),
+            ha="center", va="bottom" if above else "top",
+            fontsize=8, fontweight="bold",
+            bbox=dict(boxstyle="round,pad=0.18", facecolor="white",
+                      edgecolor="black", alpha=0.9),
+            arrowprops=dict(arrowstyle="-", color="black",
+                            linewidth=0.6, alpha=0.5),
+        )
+
+    ax.text(-75, -6, t("Garage floor (flat)"),
+            ha="center", va="top",
+            fontsize=11, style="italic")
+    ax.text(ramp.run + 75, ramp.rise + 4,
+            t("Street / outside (flat)"), ha="center", va="bottom",
+            fontsize=11, style="italic")
+
+    ax.annotate(
+        t("Origin (0, 0)\nMeasure x horizontally\nfrom here.\n"
+          "Measure y vertically."),
+        xy=(0, 0), xytext=(-120, 55),
+        fontsize=10,
+        bbox=dict(boxstyle="round,pad=0.3", facecolor="white",
+                  edgecolor="black", alpha=0.95),
+        arrowprops=dict(arrowstyle="->", color="black", linewidth=1.2),
+    )
+
+    ax.set_xlim(-160, ramp.run + 160)
+    ax.set_ylim(-25, ramp.rise + 50)
+    ax.set_xticks(np.arange(-150, ramp.run + 151, 50))
+    ax.set_xticks(np.arange(-150, ramp.run + 151, 10), minor=True)
+    ax.set_yticks(np.arange(0, ramp.rise + 41, 10))
+    ax.set_yticks(np.arange(0, ramp.rise + 41, 2), minor=True)
+    ax.grid(True, which="major", alpha=0.55, linewidth=0.9)
+    ax.grid(True, which="minor", alpha=0.18, linewidth=0.5)
+    ax.set_xlabel(t("x  (cm, horizontal - 0 at the start of the ramp)"),
+                  fontsize=12)
+    ax.set_ylabel(t("y  (cm, height above the garage floor)"), fontsize=12)
+    ax.legend(loc="lower right", fontsize=11)
+
+    # Control-point coordinates as a discreet sidenote.
+    ctrl_lines = [t("Curve control points (informative):")]
+    for i, (cx, cy) in enumerate(zip(ctrl_x, ctrl_y)):
+        ctrl_lines.append(
+            f"  cp{i+1}:  x = {cx:6.1f} cm   y = {cy:6.1f} cm"
+        )
+    ax.text(
+        0.985, 0.02,
+        "\n".join(ctrl_lines),
+        transform=ax.transAxes, ha="right", va="bottom",
+        fontsize=9, family="monospace",
+        bbox=dict(boxstyle="round,pad=0.3", facecolor="white",
+                  edgecolor=color, alpha=0.95),
+    )
+
+    fig.suptitle(
+        t("Construction blueprint - {label}  "
+          "(rise {rise:.0f} cm, run {run:.0f} cm, "
+          "stations every {step:.0f} cm)").format(
+            label=label, rise=ramp.rise, run=ramp.run,
+            step=station_step_cm,
+        ),
+        fontsize=13, fontweight="bold", y=0.985,
+    )
+
+    # ---- Table ---------------------------------------------------------- #
+    table_rows = [(
+        "n", "x (cm)", "y (cm)", t("type"),
+    )]
+    n_total = len(xs)
+    for n, (xi, yi) in enumerate(zip(xs, ys), start=1):
+        if n == 1:
+            kind = t("start station (at the garage)")
+        elif n == n_total:
+            kind = t("end station (at the street)")
+        else:
+            kind = t("intermediate station")
+        table_rows.append((str(n), f"{xi:7.1f}", f"{yi:7.1f}", kind))
+    _topref_table(fig, table_rows, n_cols=4)
+
+    pdf_path = _save_fig(fig, path)
+    print(t("Construction blueprint saved to {path} (+ PDF: {pdf})"
+            ).format(path=path, pdf=pdf_path))
+
+
 def draw_chord_blueprint(
     ramp: Ramp,
     x_curve, y_curve,
@@ -2759,6 +2941,18 @@ def compute_and_save(ramp: "Ramp", car: "Car") -> None:
             station_step_cm=30.0,
             label=t("free-form smooth curve (PCHIP)"),
             path="ramp_blueprint_top_smooth.png",
+        )
+        # Floor-reference blueprint of the smooth curve (origin at the
+        # start of the ramp; (x, y) measurements straight off the
+        # garage floor, like the original 3-slope plan).
+        draw_smooth_blueprint_groundref(
+            ramp,
+            x_curve=best_smooth["x"], y_curve=best_smooth["y"],
+            ctrl_x=best_smooth["xs_ctrl"], ctrl_y=best_smooth["ys_ctrl"],
+            color="tab:orange",
+            station_step_cm=30.0,
+            label=t("free-form smooth curve (PCHIP)"),
+            path="ramp_blueprint_smooth.png",
         )
 
         # Cord-reference blueprints (T -> B straight cord).
