@@ -50,7 +50,11 @@ dependencies = [
 build = ["pyinstaller>=5.0"]
 dev = [
     "pytest>=7",
+    "pytest-cov>=4",
+    "pytest-mpl>=0.16",
     "ruff>=0.5",
+    "mypy>=1.10",
+    "hypothesis>=6.0",
     "pyinstaller>=5.0",
 ]
 
@@ -102,11 +106,50 @@ ignore = [
 # Test files commonly use generous imports and helpers.
 "tests/*" = ["F401", "F811"]
 
+[tool.mypy]
+# Start lenient: report obvious issues, do not block CI on the
+# every-untyped-import noise that scientific stacks tend to produce.
+python_version = "3.10"
+files = ["ramp_optimizer.py"]
+ignore_missing_imports = true
+follow_imports = "silent"
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unreachable = true
+no_implicit_optional = true
+# Practical relaxations for a single-file numerical script.  Tighten
+# these as the codebase is incrementally annotated.
+disallow_untyped_defs = false
+check_untyped_defs = false
+
+[tool.coverage.run]
+source = ["."]
+omit = [
+    "tests/*",
+    "build_exe.py",
+    "build/*",
+    "dist/*",
+]
+
+[tool.coverage.report]
+exclude_also = [
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "pragma: no cover",
+]
+show_missing = true
+skip_covered = false
+
 [tool.pytest.ini_options]
 minversion = "7.0"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 addopts = "-q --strict-markers"
+markers = [
+    # Provided by pytest-mpl when it is installed; declared here so the
+    # tests run cleanly without it (no PytestUnknownMarkWarning).
+    "mpl_image_compare: pytest-mpl visual-regression marker",
+]
 filterwarnings = [
     "ignore::DeprecationWarning:matplotlib.*",
     "ignore::UserWarning:matplotlib.*",
