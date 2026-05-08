@@ -1,0 +1,22 @@
+# PyInstaller build output
+build/
+dist/
+*.spec
+
+# Spanish-build marker (created on the fly by build_exe.py --spanish)
+_lang_es.flag
+
+# Python caches
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+.venv/
+venv/
+
+# Editor / OS scratch
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
