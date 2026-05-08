@@ -1,8 +1,16 @@
 name: Release
 
-# Builds Windows executables (English + Spanish) on every `v*` tag push
-# and publishes them as a GitHub Release.  Can also be triggered
-# manually from the Actions tab.
+# Builds Windows executables (English + Spanish) and publishes them
+# to a GitHub Release.  Three entry points:
+#
+#   1.  push of a tag matching `v*` -- happens after a manual `git
+#       push origin v0.X.0` outside the release-please flow.
+#   2.  workflow_dispatch from the Actions tab -- handy when you want
+#       to rebuild an existing tag's binaries.
+#   3.  workflow_call -- used by release-please.yml to chain the
+#       build right after a release-please-created tag, without
+#       relying on cross-workflow GITHUB_TOKEN triggers (which
+#       GitHub disables for security).
 
 on:
   push:
@@ -11,8 +19,14 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Tag to publish (e.g. v0.1.0). Required for manual run."
+        description: "Tag to publish (e.g. v0.1.0)."
         required: true
+  workflow_call:
+    inputs:
+      tag:
+        description: "Tag to publish."
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -34,7 +48,17 @@ jobs:
             extra_args: "--spanish"
             outname: rampa-es.exe
     steps:
+      - name: Resolve target tag
+        id: tag
+        shell: bash
+        run: |
+          TAG="${{ inputs.tag || github.event.inputs.tag || github.ref_name }}"
+          echo "value=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Building tag: $TAG"
+
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.tag.outputs.value }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -69,7 +93,16 @@ jobs:
     needs: build-windows-exe
     runs-on: ubuntu-latest
     steps:
+      - name: Resolve target tag
+        id: tag
+        shell: bash
+        run: |
+          TAG="${{ inputs.tag || github.event.inputs.tag || github.ref_name }}"
+          echo "value=$TAG" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.tag.outputs.value }}
 
       - name: Download all build artifacts
         uses: actions/download-artifact@v4
@@ -83,8 +116,8 @@ jobs:
       - name: Create / update GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
-          name: ${{ github.event.inputs.tag || github.ref_name }}
+          tag_name: ${{ steps.tag.outputs.value }}
+          name: ${{ steps.tag.outputs.value }}
           generate_release_notes: true
           draft: false
           prerelease: false
