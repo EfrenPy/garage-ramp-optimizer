@@ -17,9 +17,9 @@ interpreter and every dependency inside the `.exe`, so there is no
 ## 2. Build the executable
 
 1. Open **`cmd`** (Command Prompt) or **PowerShell**.
-2. Navigate to the project folder:
+2. Navigate to the folder where you cloned this repository, e.g.:
 
-       cd C:\Users\Efren\Projects\garage
+       cd path\to\garage-ramp-optimizer
 
 3. Run the build script.
 

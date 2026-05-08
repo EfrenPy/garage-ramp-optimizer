@@ -3,8 +3,17 @@ build/
 dist/
 *.spec
 
-# Spanish-build marker (created on the fly by build_exe.py --spanish)
+# Spanish-build marker (created on the fly by `build_exe.py --spanish`)
 _lang_es.flag
+
+# Generated outputs of running the optimiser.  Re-generated on every
+# run, so they should never be committed.  An example screenshot used
+# by the README lives in `docs/` and is exempt from these rules.
+/ramp_blueprint*.png
+/ramp_blueprint*.pdf
+/ramp_profile.png
+/ramp_profile.pdf
+/ramp_offsets*.csv
 
 # Python caches
 __pycache__/

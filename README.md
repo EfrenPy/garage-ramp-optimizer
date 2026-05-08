@@ -5,7 +5,7 @@ its underbody when entering or exiting, given a fixed rise and a fixed
 horizontal length.  Generates worker-friendly construction blueprints
 (PNG + PDF) ready to be marked on the floor and on the side wall.
 
-![Profile comparison](ramp_profile.png)
+![Profile comparison](docs/ramp_profile.png)
 
 ## The problem
 
@@ -152,24 +152,34 @@ Parameters:
 | `-r` / `--voladizo-trasero` / `--rear-overhang` | rear overhang (cm) | 0 |
 | `--lang` | UI language (`en` / `es`) | `en` |
 
-## Project files
+## Repository layout
 
 ```
-garage/
+garage-ramp-optimizer/
 ├── ramp_optimizer.py     <- model + CLI + Tkinter GUI
 ├── build_exe.py          <- builds rampa.exe with PyInstaller
 ├── README.md             <- this file
-└── COMPILAR.md           <- detailed build / usage guide
+├── COMPILAR.md           <- detailed build / usage guide
+├── CONTRIBUTING.md       <- how to set up dev env / submit PRs
+├── LICENSE               <- MIT
+├── .gitignore
+└── docs/
+    └── ramp_profile.png  <- example output used by the README
+```
 
-# outputs (generated when the program runs)
-├── ramp_blueprint.png/.pdf                    (3 slopes, base reference)
-├── ramp_blueprint_top.png/.pdf                (3 slopes, wall ref.)
-├── ramp_blueprint_top_4slope.png/.pdf         (4 slopes, wall ref.)
-├── ramp_blueprint_top_smooth.png/.pdf         (smooth curve, wall ref.)
-├── ramp_blueprint_chord_4slope.png/.pdf       (4 slopes, cord ref.)
-├── ramp_blueprint_chord_smooth.png/.pdf       (smooth curve, cord ref.)
-├── ramp_profile.png/.pdf                      (5-profile comparison)
-└── ramp_offsets_*.csv                         (construction tables)
+When you run the optimiser it generates additional files in your
+chosen output folder (these are intentionally kept out of git via
+`.gitignore`):
+
+```
+ramp_blueprint.png/.pdf                    (3 slopes, base reference)
+ramp_blueprint_top.png/.pdf                (3 slopes, wall reference)
+ramp_blueprint_top_4slope.png/.pdf         (4 slopes, wall reference)
+ramp_blueprint_top_smooth.png/.pdf         (smooth curve, wall reference)
+ramp_blueprint_chord_4slope.png/.pdf       (4 slopes, cord reference)
+ramp_blueprint_chord_smooth.png/.pdf       (smooth curve, cord reference)
+ramp_profile.png/.pdf                      (5-profile comparison)
+ramp_offsets_*.csv                         (construction tables)
 ```
 
 ## Dependencies
