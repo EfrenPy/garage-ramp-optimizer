@@ -66,6 +66,12 @@ many positions and measures:
 
 The optimiser maximises the **smaller of the two** (min-max criterion).
 
+## What it looks like
+
+The GUI itself (Tkinter, ships inside the same `rampa.exe`):
+
+<p align="center"><img src="docs/gui_screenshot.png" alt="Tkinter GUI" width="640"></p>
+
 ## Sample blueprints
 
 Two of the five worker blueprints generated for the default scenario
