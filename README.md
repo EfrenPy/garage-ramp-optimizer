@@ -1,11 +1,22 @@
 # Garage Ramp Optimizer
 
+[![Latest release](https://img.shields.io/github/v/release/EfrenPy/garage-ramp-optimizer?display_name=tag&sort=semver)](https://github.com/EfrenPy/garage-ramp-optimizer/releases/latest)
+[![CI](https://github.com/EfrenPy/garage-ramp-optimizer/actions/workflows/ci.yml/badge.svg)](https://github.com/EfrenPy/garage-ramp-optimizer/actions/workflows/ci.yml)
+[![Release build](https://github.com/EfrenPy/garage-ramp-optimizer/actions/workflows/release.yml/badge.svg)](https://github.com/EfrenPy/garage-ramp-optimizer/actions/workflows/release.yml)
+[![License: MIT](https://img.shields.io/github/license/EfrenPy/garage-ramp-optimizer)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/downloads/)
+[![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+
 Compute the **optimal shape of a garage ramp** so a car does not scrape
 its underbody when entering or exiting, given a fixed rise and a fixed
 horizontal length.  Generates worker-friendly construction blueprints
 (PNG + PDF) ready to be marked on the floor and on the side wall.
 
 ![Profile comparison](docs/ramp_profile.png)
+*Comparison of the five profile families the optimiser explores. The
+free-form smooth curve (rightmost column) leaves only ~5 mm of
+interference for the default Seat León FR 2025 + 136 cm rise / 540 cm
+run scenario.*
 
 ## The problem
 
@@ -54,6 +65,23 @@ many positions and measures:
 - the worst **front-overhang clearance** (bumper scrape risk).
 
 The optimiser maximises the **smaller of the two** (min-max criterion).
+
+## Sample blueprints
+
+Two of the five worker blueprints generated for the default scenario
+(Seat León FR 2025, 136 cm rise over 540 cm of run). All blueprints
+ship as both PNG and vector PDF — zoom into the PDF without
+pixelation when you print or project them.
+
+**Wall reference (smooth profile)** — chalk-line on the side wall as
+the visual anchor; every station is `(u, d, drop-from-wall)`.
+
+![Wall reference, smooth profile](docs/sample_wall_smooth.png)
+
+**Cord reference (smooth profile)** — straight cord stretched between
+the upper corner T and the lower corner B; every station is `(s, p)`.
+
+![Cord reference, smooth profile](docs/sample_chord_smooth.png)
 
 ## Three coordinate systems for the worker
 
@@ -156,15 +184,36 @@ Parameters:
 
 ```
 garage-ramp-optimizer/
-├── ramp_optimizer.py     <- model + CLI + Tkinter GUI
-├── build_exe.py          <- builds rampa.exe with PyInstaller
-├── README.md             <- this file
-├── COMPILAR.md           <- detailed build / usage guide
-├── CONTRIBUTING.md       <- how to set up dev env / submit PRs
-├── LICENSE               <- MIT
+├── ramp_optimizer.py            <- model + CLI + Tkinter GUI (single file)
+├── build_exe.py                 <- builds rampa.exe with PyInstaller
+├── pyproject.toml               <- project metadata + ruff / pytest config
+├── requirements.txt             <- runtime + build dependencies
+├── README.md                    <- this file
+├── CHANGELOG.md
+├── COMPILAR.md                  <- detailed build / usage guide
+├── CONTRIBUTING.md              <- dev setup / submitting PRs / i18n notes
+├── SECURITY.md                  <- vulnerability reporting policy
+├── LICENSE                      <- MIT
 ├── .gitignore
+├── .github/
+│   ├── workflows/
+│   │   ├── ci.yml               <- lint + tests on push / PR
+│   │   └── release.yml          <- builds rampa-en.exe + rampa-es.exe on tag
+│   ├── ISSUE_TEMPLATE/
+│   ├── PULL_REQUEST_TEMPLATE.md
+│   └── dependabot.yml
+├── tests/                       <- pytest suite (chord coords, profiles, i18n,
+│   │                                evaluator invariants, dataclasses)
+│   ├── conftest.py
+│   ├── test_chord_coords.py
+│   ├── test_dataclasses.py
+│   ├── test_evaluate.py
+│   ├── test_i18n.py
+│   └── test_profiles.py
 └── docs/
-    └── ramp_profile.png  <- example output used by the README
+    ├── ramp_profile.png         <- sample comparison plot for the README
+    ├── sample_wall_smooth.png   <- sample wall-reference blueprint
+    └── sample_chord_smooth.png  <- sample cord-reference blueprint
 ```
 
 When you run the optimiser it generates additional files in your

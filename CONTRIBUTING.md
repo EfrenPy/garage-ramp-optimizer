@@ -69,8 +69,16 @@ The result lands in `dist/rampa.exe` (Windows) or `dist/rampa`
   for the heavy global searches, and `matplotlib` (Agg backend) for
   every figure.  No interactive backends — the GUI is Tkinter, kept
   separate from matplotlib's GUI.
-- Run a quick syntax check before opening a PR:
-  `python -m py_compile ramp_optimizer.py build_exe.py`.
+- Run the lint + test pass before opening a PR:
+
+  ```bash
+  python -m ruff check .
+  python -m pytest -q
+  python -m py_compile ramp_optimizer.py build_exe.py
+  ```
+
+  The same three checks run automatically on every push and pull
+  request via `.github/workflows/ci.yml`.
 
 ## Adding or changing user-visible strings
 
@@ -124,6 +132,16 @@ Before pressing "Create pull request":
       `CONTRIBUTING.md`.
 - [ ] No build artifacts (`dist/`, `build/`, `*.spec`,
       `__pycache__/`, generated PNG/PDF/CSV) are staged.
+
+## Recorded follow-ups
+
+The codebase is currently a single 3500-line module
+(`ramp_optimizer.py`).  A package split into something like
+`src/ramp_optimizer/{i18n,model,profiles,blueprints,gui,cli}.py`
+would make the file tree easier to navigate without changing the
+logic.  Doing it incrementally — one file at a time, with the test
+suite covering the public surface after each move — would be a
+welcome contribution.
 
 ## Code of conduct
 

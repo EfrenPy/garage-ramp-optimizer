@@ -415,14 +415,8 @@ _TRANSLATIONS_ES: "dict[str, str]" = {
     "T (street)":     "T (calle)",
     "True-scale view - garage on the left, street on the right. The dashed line is the reference straight cord.":
         "Vista a escala real - garaje a la izquierda, calle a la derecha. La linea discontinua es la cuerda recta de referencia.",
-    "Reference straight cord (length {L:.2f} cm)":
-        "Cuerda recta de referencia (longitud {L:.2f} cm)",
     "Curve control points":
         "Puntos de control de la curva",
-    "B (garage, bottom)\ns = {L:.1f} cm,  p = 0 cm":
-        "B (garaje / parte baja)\ns = {L:.1f} cm,  p = 0 cm",
-    "T (street, top)\ns = 0 cm,  p = 0 cm":
-        "T (calle / parte alta)\ns = 0 cm,  p = 0 cm",
     "Stretch a tight straight cord between B (garage) and T (street). Total length = {L:.2f} cm.\ns = distance along the cord measured from T toward B.   p = perpendicular distance from the cord.\np > 0  =  profile ABOVE the cord.   p < 0  =  profile BELOW the cord.":
         "Tender una cuerda recta tensa entre B (garaje) y T (calle). Longitud total = {L:.2f} cm.\ns = distancia a lo largo de la cuerda medida desde T hacia B.   p = distancia perpendicular a la cuerda.\np positivo  =  perfil POR ENCIMA de la cuerda.   p negativo  =  perfil POR DEBAJO de la cuerda.",
     "x (cm) - horizontal distance (0 = start of the ramp at the garage)":
@@ -440,8 +434,6 @@ _TRANSLATIONS_ES: "dict[str, str]" = {
         "estacion inferior (en B, junto al garaje)",
     "intermediate station":
         "estacion intermedia",
-    "pt":     "pt",
-    "what":   "que es",
     "x (cm) original":   "x (cm) original",
     "y (cm) original":   "y (cm) original",
     "Construction blueprint (reference: straight cord T -> B) - {label}  (cord = {L:.2f} cm, rise {rise:.0f} cm, run {run:.0f} cm)":
@@ -558,9 +550,6 @@ _TRANSLATIONS_ES: "dict[str, str]" = {
         "Tramo {n} (medio)",
     "Slope 3 (near the street / top)":
         "Tramo 3 (junto a la calle / arriba)",
-    "Slope 2 (middle)":      "Tramo 2 (medio)",
-    "Slope 1 (near the garage / bottom)":
-        "Tramo 1 (junto al garaje / abajo)",
     "{name}\n{deg:.2f} degrees ({pct:.1f} %)\nlength along plane = {L:.1f} cm":
         "{name}\n{deg:.2f} grados ({pct:.1f} %)\nlongitud sobre el plano = {L:.1f} cm",
 
@@ -581,8 +570,6 @@ _TRANSLATIONS_ES: "dict[str, str]" = {
     # 3-slope original blueprint.
     "True-scale view (1 cm vertical = 1 cm horizontal)":
         "Vista a escala real (1 cm vertical = 1 cm horizontal)",
-    "Ramp profile to build":
-        "Perfil de la rampa a construir",
     "Working drawing (vertical scale exaggerated for clarity) - use the (x, y) numbers, not the visual proportions":
         "Plano de trabajo (escala vertical aumentada para mayor claridad) - usar los valores (x, y), no las proporciones visuales",
     "Construction blueprint - 3-slope ramp  (rise {rise:.0f} cm, run {run:.0f} cm)":
@@ -591,8 +578,6 @@ _TRANSLATIONS_ES: "dict[str, str]" = {
         "x  (cm, horizontal - 0 en el inicio de la rampa)",
     "y  (cm, height above the garage floor)":
         "y  (cm, altura sobre el suelo del garaje)",
-    "smooth curve (R={r:.0f} cm)":
-        "curva suave (R={r:.0f} cm)",
 
     # Top-reference blueprint chrome.
     "Side wall ({h:.0f} cm above the street)":
@@ -603,8 +588,6 @@ _TRANSLATIONS_ES: "dict[str, str]" = {
         "d (cm) - profundidad bajo el plano superior",
     "drop {drop:.1f} cm\nfrom the wall to {label}":
         "bajada {drop:.1f} cm\ndesde el muro hasta {label}",
-    "drop {drop:.1f} cm\nfrom wall to {label}":
-        "bajada {drop:.1f} cm\ndesde el muro al {label}",
     "start (garage floor)":
         "inicio (suelo del garaje)",
     "end (street)":
@@ -657,8 +640,6 @@ _TRANSLATIONS_ES: "dict[str, str]" = {
     "Wheelbase":         "Batalla",
     "Front overhang":    "Voladizo delantero",
     "Rear overhang":     "Voladizo trasero",
-    "Done. Blueprints and CSV files generated.":
-        "Listo. Planos y CSV generados.",
 
     # GUI stage messages.
     "Optimizing: two arcs + straight...":
@@ -1879,7 +1860,6 @@ def draw_three_slope_blueprint_topref(
           "(where the street begins).\n"
           "Measure u to the left (toward the garage).\n"
           "Measure d downward."),
-        "Medir d hacia abajo.",
         xy=(0, 0), xytext=(-130, 60),
         fontsize=10,
         bbox=dict(boxstyle="round,pad=0.35", facecolor="white",
