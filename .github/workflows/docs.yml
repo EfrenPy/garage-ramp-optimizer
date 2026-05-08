@@ -1,0 +1,79 @@
+name: Deploy docs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "mkdocs.yml"
+      - "README.md"
+      - "COMPILAR.md"
+      - "CONTRIBUTING.md"
+      - "SECURITY.md"
+      - "CHANGELOG.md"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install MkDocs Material
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install mkdocs-material mkdocs-include-markdown-plugin
+
+      - name: Sync top-level docs into docs/
+        # README.md and the other top-level Markdown files are the
+        # canonical sources; keep MkDocs in sync with them on each
+        # deploy so we do not have to remember to copy by hand.
+        run: |
+          cp README.md      docs/index.md
+          cp COMPILAR.md    docs/COMPILAR.md
+          cp CONTRIBUTING.md docs/CONTRIBUTING.md
+          cp SECURITY.md    docs/SECURITY.md
+          cp CHANGELOG.md   docs/CHANGELOG.md
+          # Image paths in README use docs/ prefixes; rewrite for the
+          # MkDocs build (where docs/ is the root).
+          sed -i \
+              -e 's|docs/ramp_profile.png|ramp_profile.png|g' \
+              -e 's|docs/sample_chord_smooth.png|sample_chord_smooth.png|g' \
+              -e 's|docs/sample_wall_smooth.png|sample_wall_smooth.png|g' \
+              -e 's|docs/gui_screenshot.png|gui_screenshot.png|g' \
+              docs/index.md
+
+      - name: Build site
+        run: mkdocs build --strict
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

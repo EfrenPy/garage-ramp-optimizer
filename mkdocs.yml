@@ -1,0 +1,77 @@
+site_name: Garage Ramp Optimizer
+site_description: >-
+  Compute the optimal shape of a garage ramp so a car does not scrape
+  its underbody.  GUI + CLI, generates worker-friendly construction
+  blueprints (PNG/PDF) in three reference systems.
+site_author: Efrén Rodríguez Rodríguez
+site_url: https://efrenrodriguezrodriguez.com/garage-ramp-optimizer/
+repo_url: https://github.com/EfrenPy/garage-ramp-optimizer
+repo_name: EfrenPy/garage-ramp-optimizer
+edit_uri: edit/main/docs/
+
+# All authoritative docs live next to the source under docs/.  README.md
+# is reused as the landing page via a small relative-link rewrite.
+docs_dir: docs
+site_dir: _site
+
+theme:
+  name: material
+  language: en
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: green
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: green
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.action.edit
+    - content.tabs.link
+  icon:
+    repo: fontawesome/brands/github
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/EfrenPy/garage-ramp-optimizer
+    - icon: fontawesome/solid/globe
+      link: https://efrenrodriguezrodriguez.com/
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+
+nav:
+  - Home: index.md
+  - Build & install: COMPILAR.md
+  - Contributing: CONTRIBUTING.md
+  - Security: SECURITY.md
+  - Changelog: CHANGELOG.md

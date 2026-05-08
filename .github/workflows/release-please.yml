@@ -1,0 +1,30 @@
+name: release-please
+
+# Watches `main` for Conventional Commits, opens a PR that bumps the
+# version and updates CHANGELOG.md, and -- once that PR is merged --
+# tags the new release.  The existing release.yml workflow then picks
+# up the tag and builds the Windows .exe assets.
+#
+# Reference: https://github.com/googleapis/release-please-action
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v4
+        with:
+          # `python` automatically updates `pyproject.toml`'s version
+          # and prepends to CHANGELOG.md (Keep-a-Changelog format).
+          release-type: python
+          # Conventional commits live on `main`; the action proposes a
+          # PR like "chore(main): release 0.2.0" that, once merged,
+          # tags the version.

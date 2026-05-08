@@ -3,6 +3,9 @@ build/
 dist/
 *.spec
 
+# MkDocs build output
+_site/
+
 # Spanish-build marker (created on the fly by `build_exe.py --spanish`)
 _lang_es.flag
 
