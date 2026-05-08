@@ -1,0 +1,113 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "garage-ramp-optimizer"
+version = "0.1.0"
+description = "Compute the optimal shape of a garage ramp so a car does not scrape its underbody. GUI + CLI, generates worker-friendly construction blueprints (PNG/PDF) in three reference systems."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Efren Rodriguez Rodriguez" },
+]
+keywords = [
+    "garage",
+    "ramp",
+    "geometry",
+    "optimization",
+    "blueprint",
+    "construction",
+    "tkinter",
+    "gui",
+    "matplotlib",
+    "pyinstaller",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Win32 (MS Windows)",
+    "Environment :: X11 Applications",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "Topic :: Scientific/Engineering :: Visualization",
+    "Topic :: Utilities",
+]
+dependencies = [
+    "numpy>=1.20",
+    "scipy>=1.7",
+    "matplotlib>=3.5",
+]
+
+[project.optional-dependencies]
+build = ["pyinstaller>=5.0"]
+dev = [
+    "pytest>=7",
+    "ruff>=0.5",
+    "pyinstaller>=5.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/EfrenPy/garage-ramp-optimizer"
+Repository = "https://github.com/EfrenPy/garage-ramp-optimizer"
+Issues = "https://github.com/EfrenPy/garage-ramp-optimizer/issues"
+Changelog = "https://github.com/EfrenPy/garage-ramp-optimizer/blob/main/CHANGELOG.md"
+"Author website" = "https://efrenrodriguezrodriguez.com/"
+
+[project.scripts]
+ramp-optimizer = "ramp_optimizer:main"
+
+# Tell setuptools that the project is a single top-level module
+# (ramp_optimizer.py), not a package.
+[tool.setuptools]
+py-modules = ["ramp_optimizer"]
+
+# -------------------------------------------------------------------- #
+#  Tooling configuration
+# -------------------------------------------------------------------- #
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+extend-exclude = ["build", "dist", "__pycache__"]
+
+[tool.ruff.lint]
+# Start strict-but-pragmatic. Keep the bug-catchers and pyflakes
+# checks; do NOT enable the rest of the cosmetic rules until the
+# codebase is fully audited.
+select = [
+    "E9",   # syntax / runtime errors
+    "F",    # pyflakes (undefined names, unused imports, etc.)
+    "W6",   # tab/indentation issues
+]
+ignore = [
+    "E501",   # line-too-long (handled visually; long matplotlib calls)
+    "F401",   # unused imports inside try/except blocks (matplotlib, scipy)
+    "F403",   # star imports (we don't have any, but defensive)
+    "F841",   # unused locals (geometry unpacks like (du, dd) keep both
+              # for symmetry / future use; relaxing this keeps the
+              # ruff pass green without churn).
+]
+
+[tool.ruff.lint.per-file-ignores]
+# The translation dictionary contains many long string literals.
+"ramp_optimizer.py" = ["E501"]
+# Test files commonly use generous imports and helpers.
+"tests/*" = ["F401", "F811"]
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-q --strict-markers"
+filterwarnings = [
+    "ignore::DeprecationWarning:matplotlib.*",
+    "ignore::UserWarning:matplotlib.*",
+]

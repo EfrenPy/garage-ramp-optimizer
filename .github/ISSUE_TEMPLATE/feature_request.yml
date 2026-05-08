@@ -1,0 +1,33 @@
+name: Feature request
+description: Suggest a new feature or improvement.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem this would solve
+      description: |
+        What is the user need or pain point? If possible, describe
+        the situation you are in and why the current behaviour does
+        not cover it.
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: |
+        What would you like the program to do? Sketches, mockups,
+        sample outputs and references are very welcome.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Optional. Other approaches you thought about.
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else?
