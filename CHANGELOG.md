@@ -6,6 +6,13 @@ The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this
 project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0](https://github.com/EfrenPy/garage-ramp-optimizer/compare/v0.3.0...v0.4.0) (2026-05-08)
+
+
+### Features
+
+* **i18n:** localize the output filenames in Spanish builds ([cbe6e55](https://github.com/EfrenPy/garage-ramp-optimizer/commit/cbe6e5589f054ba59d2486c7e1e8c6c851c8caff))
+
 ## [0.3.0](https://github.com/EfrenPy/garage-ramp-optimizer/compare/v0.2.0...v0.3.0) (2026-05-08)
 
 
