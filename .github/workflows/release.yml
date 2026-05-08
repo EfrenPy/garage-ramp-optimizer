@@ -45,7 +45,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install numpy scipy matplotlib pyinstaller
+          python -m pip install -r requirements.txt
 
       - name: Build executable (${{ matrix.label }})
         run: python build_exe.py ${{ matrix.extra_args }}

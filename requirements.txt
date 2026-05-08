@@ -1,0 +1,8 @@
+# Runtime dependencies of ramp_optimizer.py.
+# Tkinter is not listed because it ships with Python.
+numpy>=1.20
+scipy>=1.7
+matplotlib>=3.5
+
+# Build-time dependency — only needed to compile the .exe with build_exe.py.
+pyinstaller>=5.0
