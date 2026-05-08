@@ -6,6 +6,18 @@ The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this
 project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0](https://github.com/EfrenPy/garage-ramp-optimizer/compare/v0.2.0...v0.3.0) (2026-05-08)
+
+
+### Features
+
+* **blueprints:** add floor-reference smooth-curve blueprint (PNG + PDF) ([c757e9b](https://github.com/EfrenPy/garage-ramp-optimizer/commit/c757e9bbea29fc2b0dea65f1f768984735b16bed))
+
+
+### Documentation
+
+* add codecov badge to README ([eeb87bf](https://github.com/EfrenPy/garage-ramp-optimizer/commit/eeb87bf8f16bd05d8595898afd286e2a4b6d3341))
+
 ## [0.2.0](https://github.com/EfrenPy/garage-ramp-optimizer/compare/v0.1.0...v0.2.0) (2026-05-08)
 
 
