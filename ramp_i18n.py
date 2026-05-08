@@ -243,6 +243,8 @@ _TRANSLATIONS_ES: "dict[str, str]" = {
         "Plano de construccion (cuerda) guardado en {path} (+ PDF: {pdf})",
     "Profile comparison plot saved to ramp_profile.png (+ PDF: {pdf})":
         "Grafica de perfiles guardada en ramp_profile.png (+ PDF: {pdf})",
+    "(matplotlib is not installed; skipping comparison plot)":
+        "(matplotlib no esta instalado; no se genera la grafica)",
     "Top-reference cord offsets ({label}) saved to {path}":
         "Cotas con referencia a cuerda ({label}) guardadas en {path}",
     "Top-reference offsets ({label}) saved to {path}":

@@ -12,11 +12,18 @@ _lang_es.flag
 # Generated outputs of running the optimiser.  Re-generated on every
 # run, so they should never be committed.  An example screenshot used
 # by the README lives in `docs/` and is exempt from these rules.
+# English filenames:
 /ramp_blueprint*.png
 /ramp_blueprint*.pdf
 /ramp_profile.png
 /ramp_profile.pdf
 /ramp_offsets*.csv
+# Spanish filenames (when running with --lang es / --spanish build):
+/plano_rampa*.png
+/plano_rampa*.pdf
+/comparativa_rampas.png
+/comparativa_rampas.pdf
+/cotas*.csv
 
 # Python caches
 __pycache__/

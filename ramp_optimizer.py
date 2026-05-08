@@ -144,6 +144,63 @@ def _set_language(value: str) -> None:
     ramp_i18n.LANGUAGE = value
 
 
+# --------------------------------------------------------------------------- #
+#  Output-filename localization
+# --------------------------------------------------------------------------- #
+# The English filenames are unchanged so users / scripts that rely on them
+# keep working.  In Spanish builds we swap to localised names so the worker
+# does not have to deal with English file names.
+
+_OUTPUT_NAMES_EN = {
+    "blueprint_3slope":         "ramp_blueprint",
+    "blueprint_3slope_top":     "ramp_blueprint_top",
+    "blueprint_4slope_top":     "ramp_blueprint_top_4slope",
+    "blueprint_smooth_top":     "ramp_blueprint_top_smooth",
+    "blueprint_4slope_chord":   "ramp_blueprint_chord_4slope",
+    "blueprint_smooth_chord":   "ramp_blueprint_chord_smooth",
+    "blueprint_smooth_floor":   "ramp_blueprint_smooth",
+    "blueprint_compare":        "ramp_profile",
+    "csv_2arc":                 "ramp_offsets",
+    "csv_3slope":               "ramp_offsets_3slope",
+    "csv_3slope_top":           "ramp_offsets_3slope_top",
+    "csv_4slope":               "ramp_offsets_4slope",
+    "csv_4slope_chord":         "ramp_offsets_4slope_chord",
+    "csv_4slope_top":           "ramp_offsets_4slope_top",
+    "csv_smooth":               "ramp_offsets_smooth",
+    "csv_smooth_chord":         "ramp_offsets_smooth_chord",
+    "csv_smooth_top":           "ramp_offsets_smooth_top",
+}
+
+_OUTPUT_NAMES_ES = {
+    "blueprint_3slope":         "plano_rampa_3tramos",
+    "blueprint_3slope_top":     "plano_rampa_3tramos_muro",
+    "blueprint_4slope_top":     "plano_rampa_4tramos_muro",
+    "blueprint_smooth_top":     "plano_rampa_curva_muro",
+    "blueprint_4slope_chord":   "plano_rampa_4tramos_cuerda",
+    "blueprint_smooth_chord":   "plano_rampa_curva_cuerda",
+    "blueprint_smooth_floor":   "plano_rampa_curva",
+    "blueprint_compare":        "comparativa_rampas",
+    "csv_2arc":                 "cotas_arcos_recta",
+    "csv_3slope":               "cotas_3tramos",
+    "csv_3slope_top":           "cotas_3tramos_muro",
+    "csv_4slope":               "cotas_4tramos",
+    "csv_4slope_chord":         "cotas_4tramos_cuerda",
+    "csv_4slope_top":           "cotas_4tramos_muro",
+    "csv_smooth":               "cotas_curva",
+    "csv_smooth_chord":         "cotas_curva_cuerda",
+    "csv_smooth_top":           "cotas_curva_muro",
+}
+
+
+def _output_name(key: str, ext: str) -> str:
+    """Return the output filename for *key* in the active language.
+
+    *ext* must include the leading dot (e.g. ``".png"``, ``".csv"``).
+    """
+    table = _OUTPUT_NAMES_ES if LANGUAGE == "es" else _OUTPUT_NAMES_EN
+    return table[key] + ext
+
+
 try:
     import matplotlib
     # Backend no interactivo: solo necesitamos guardar figuras a fichero
@@ -2857,7 +2914,7 @@ def compute_and_save(ramp: "Ramp", car: "Car") -> None:
     print()
     report(t("Optimal three-segment ramp (two arcs + straight)"), best)
 
-    write_offsets("ramp_offsets.csv", best["x"], best["y"])
+    write_offsets(_output_name("csv_2arc", ".csv"), best["x"], best["y"])
 
     # ---- 3 piecewise-linear slopes -------------------------------------- #
     print(t("Searching the best three-slope profile ..."))
@@ -2880,8 +2937,8 @@ def compute_and_save(ramp: "Ramp", car: "Car") -> None:
             ).format(fillet=best3["fillet"]))
     print()
     report(t("Optimal three-slope ramp"), best3)
-    write_offsets("ramp_offsets_3slope.csv", best3["x"], best3["y"], n=28)
-    draw_three_slope_blueprint(ramp, best3, "ramp_blueprint.png")
+    write_offsets(_output_name("csv_3slope", ".csv"), best3["x"], best3["y"], n=28)
+    draw_three_slope_blueprint(ramp, best3, _output_name("blueprint_3slope", ".png"))
 
     # ---- 4 slopes + free-form smooth curve (parallel) ------------------- #
     best4 = None
@@ -2907,7 +2964,8 @@ def compute_and_save(ramp: "Ramp", car: "Car") -> None:
             ))
         print()
         report(t("Optimal four-slope ramp"), best4)
-        write_offsets("ramp_offsets_4slope.csv", best4["x"], best4["y"], n=28)
+        write_offsets(_output_name("csv_4slope", ".csv"),
+                      best4["x"], best4["y"], n=28)
 
         print(t("Best control points of the smooth curve:"))
         print(f"  {'i':>2}  {'x (cm)':>8}  {'y (cm)':>8}")
@@ -2918,7 +2976,7 @@ def compute_and_save(ramp: "Ramp", car: "Car") -> None:
             print(f"  {i:>2}  {xc:8.1f}  {yc:8.2f}  {tag}")
         print()
         report(t("Optimal smooth ramp (PCHIP monotone spline)"), best_smooth)
-        write_offsets("ramp_offsets_smooth.csv",
+        write_offsets(_output_name("csv_smooth", ".csv"),
                       best_smooth["x"], best_smooth["y"], n=40)
 
         # Worker-friendly blueprints (top-of-ramp / wall reference).
@@ -2930,7 +2988,7 @@ def compute_and_save(ramp: "Ramp", car: "Car") -> None:
             color="tab:purple",
             wall_height_above_top=WALL_OFFSET,
             label=t("4-slope ramp"),
-            path="ramp_blueprint_top_4slope.png",
+            path=_output_name("blueprint_4slope_top", ".png"),
         )
         draw_smooth_blueprint_topref(
             ramp,
@@ -2940,7 +2998,7 @@ def compute_and_save(ramp: "Ramp", car: "Car") -> None:
             wall_height_above_top=WALL_OFFSET,
             station_step_cm=30.0,
             label=t("free-form smooth curve (PCHIP)"),
-            path="ramp_blueprint_top_smooth.png",
+            path=_output_name("blueprint_smooth_top", ".png"),
         )
         # Floor-reference blueprint of the smooth curve (origin at the
         # start of the ramp; (x, y) measurements straight off the
@@ -2952,7 +3010,7 @@ def compute_and_save(ramp: "Ramp", car: "Car") -> None:
             color="tab:orange",
             station_step_cm=30.0,
             label=t("free-form smooth curve (PCHIP)"),
-            path="ramp_blueprint_smooth.png",
+            path=_output_name("blueprint_smooth_floor", ".png"),
         )
 
         # Cord-reference blueprints (T -> B straight cord).
@@ -2962,7 +3020,7 @@ def compute_and_save(ramp: "Ramp", car: "Car") -> None:
             label=t("4-slope ramp"),
             color="tab:purple",
             breaks=best4["breaks"],
-            path="ramp_blueprint_chord_4slope.png",
+            path=_output_name("blueprint_4slope_chord", ".png"),
         )
         draw_chord_blueprint(
             ramp,
@@ -2972,15 +3030,15 @@ def compute_and_save(ramp: "Ramp", car: "Car") -> None:
             breaks=None,
             ctrl_x=best_smooth["xs_ctrl"], ctrl_y=best_smooth["ys_ctrl"],
             station_step_cm=30.0,
-            path="ramp_blueprint_chord_smooth.png",
+            path=_output_name("blueprint_smooth_chord", ".png"),
         )
 
-        # CSVs (s, p) para los dos perfiles, referidos a la cuerda recta.
+        # CSVs (s, p) for the two profiles, in the cord reference.
         for profile_name, x_arr, y_arr, fname in [
             ("4 tramos", best4["x"], best4["y"],
-             "ramp_offsets_4slope_chord.csv"),
+             _output_name("csv_4slope_chord", ".csv")),
             ("suave", best_smooth["x"], best_smooth["y"],
-             "ramp_offsets_smooth_chord.csv"),
+             _output_name("csv_smooth_chord", ".csv")),
         ]:
             s_arr, p_arr = chord_coords(ramp, x_arr, y_arr)
             order = np.argsort(s_arr)
@@ -3003,9 +3061,9 @@ def compute_and_save(ramp: "Ramp", car: "Car") -> None:
         # Top-reference (u, d) CSVs for both profiles.
         for name, xc, yc, fname in [
             ("4 slopes", best4["x"], best4["y"],
-             "ramp_offsets_4slope_top.csv"),
+             _output_name("csv_4slope_top", ".csv")),
             ("smooth",   best_smooth["x"], best_smooth["y"],
-             "ramp_offsets_smooth_top.csv"),
+             _output_name("csv_smooth_top", ".csv")),
         ]:
             u_arr = ramp.run - xc
             d_arr = ramp.rise - yc
@@ -3061,7 +3119,7 @@ def compute_and_save(ramp: "Ramp", car: "Car") -> None:
     draw_three_slope_blueprint_topref(
         ramp, best3,
         wall_height_above_top=WALL_OFFSET_OVER_TOP,
-        path="ramp_blueprint_top.png",
+        path=_output_name("blueprint_3slope_top", ".png"),
     )
 
     # 3-slope (u, d) top-reference CSV.
@@ -3072,7 +3130,8 @@ def compute_and_save(ramp: "Ramp", car: "Car") -> None:
     d_arr = d_arr[order]
     us_top = np.linspace(0.0, u_arr[-1], 28)
     ds_top = np.interp(us_top, u_arr, d_arr)
-    with open("ramp_offsets_3slope_top.csv", "w", newline="") as f:
+    csv_3slope_top = _output_name("csv_3slope_top", ".csv")
+    with open(csv_3slope_top, "w", newline="") as f:
         w = csv.writer(f)
         w.writerow([
             "u_cm_from_top_edge",
@@ -3083,7 +3142,7 @@ def compute_and_save(ramp: "Ramp", car: "Car") -> None:
             w.writerow([f"{ui:.2f}", f"{di:.2f}",
                         f"{WALL_OFFSET_OVER_TOP + di:.2f}"])
     print(t("Top-reference offsets saved to {path}").format(
-        path="ramp_offsets_3slope_top.csv",
+        path=csv_3slope_top,
     ))
 
     # Print key points of the 3-slope ramp to the terminal.
@@ -3268,11 +3327,12 @@ def compute_and_save(ramp: "Ramp", car: "Car") -> None:
             fontsize=12,
         )
         fig.tight_layout(rect=(0, 0, 1, 0.97))
-        pdf_path = _save_fig(fig, "ramp_profile.png", dpi=120)
-        print(f"Grafica de perfiles guardada en ramp_profile.png "
-              f"(+ PDF: {pdf_path})")
+        compare_png = _output_name("blueprint_compare", ".png")
+        pdf_path = _save_fig(fig, compare_png, dpi=120)
+        print(t("Profile comparison plot saved to ramp_profile.png "
+                "(+ PDF: {pdf})").format(pdf=pdf_path))
     else:
-        print("(matplotlib no esta instalado; no se genera la grafica)")
+        print(t("(matplotlib is not installed; skipping comparison plot)"))
 
 
 def launch_gui() -> None:
@@ -3473,19 +3533,23 @@ def launch_gui() -> None:
          55, t("4 slopes done. Waiting for the smooth curve...")),
         (_trig("Optimal smooth ramp (PCHIP monotone spline)"),
          70, t("Generating 4-slope blueprints...")),
-        ("ramp_blueprint_top_4slope",
+        # The blueprint-progress triggers below match the basename of
+        # each generated file; the names switch with the active language
+        # (see _OUTPUT_NAMES_*), so we resolve them through
+        # ``_output_name`` instead of hard-coding the English strings.
+        (_output_name("blueprint_4slope_top", ""),
          76, t("Generating smooth-curve blueprints...")),
-        ("ramp_blueprint_top_smooth",
+        (_output_name("blueprint_smooth_top", ""),
          80, t("Generating cord-reference blueprints...")),
-        ("ramp_blueprint_chord_4slope",
+        (_output_name("blueprint_4slope_chord", ""),
          83, t("Generating cord-reference blueprints...")),
-        ("ramp_blueprint_chord_smooth",
+        (_output_name("blueprint_smooth_chord", ""),
          86, t("Generating top-reference 3-slope blueprint...")),
-        ("ramp_blueprint_top.png",
+        (_output_name("blueprint_3slope_top", ".png"),
          88, t("Computing sensitivity to ramp length...")),
         (_trig("Sensitivity if the ramp is lengthened"),
          90, t("Computing sensitivity to ramp length...")),
-        ("ramp_profile.png",
+        (_output_name("blueprint_compare", ".png"),
          100, t("Done. Blueprints and CSVs generated.")),
     ]
     current_stage = [0]
