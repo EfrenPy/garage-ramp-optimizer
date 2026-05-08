@@ -1,0 +1,783 @@
+# Translation template for the garage ramp optimizer.
+# Copyright (C) 2026 Efren Rodriguez Rodriguez
+# This file is distributed under the same MIT licence as the project.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: garage-ramp-optimizer 0.1.0\n"
+"POT-Creation-Date: 2026-05-08 10:45+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "GARAGE RAMP OPTIMIZER"
+msgstr ""
+
+msgid "Author: Efren Rodriguez Rodriguez"
+msgstr ""
+
+msgid "Web:   https://efrenrodriguezrodriguez.com/"
+msgstr ""
+
+msgid "Enter the dimensions of the ramp you want to build."
+msgstr ""
+
+msgid "Car data (press Enter to use the defaults for a Seat Leon FR 2025):"
+msgstr ""
+
+msgid "Total rise between the garage floor and the street (cm)"
+msgstr ""
+
+msgid "Horizontal length of the ramp (cm)"
+msgstr ""
+
+msgid "Ground clearance of the lowest underbody point (cm)"
+msgstr ""
+
+msgid "Wheelbase / distance between axles (cm)"
+msgstr ""
+
+msgid "Front overhang (axle to lowest front point, cm)"
+msgstr ""
+
+msgid "Rear overhang (0 if it does not scrape, cm)"
+msgstr ""
+
+msgid "Ramp:  rise = {rise} cm,  run = {run} cm,  mean grade = {pct:.1f} % ({deg:.2f} degrees)"
+msgstr ""
+
+msgid "Car:   ground clearance = {clearance} cm,  wheelbase = {wheelbase} cm,"
+msgstr ""
+
+msgid "       front overhang = {fo} cm,  rear overhang = {ro} cm"
+msgstr ""
+
+msgid "I do not understand that number. Try again."
+msgstr ""
+
+msgid "The value must be greater than {minimum}. Try again."
+msgstr ""
+
+msgid "Input cancelled."
+msgstr ""
+
+msgid "ERROR: rise and run must be positive."
+msgstr ""
+
+msgid "WARNING: rise is greater than or equal to run. The mean grade would be >= 100 % (45 degrees or more), which is not realistic for a car."
+msgstr ""
+
+msgid "Garage ramp profile optimizer. Computes the optimal ramp shape to avoid scraping, using several methods (linear ramp, two arcs + straight, 3 segments, 4 segments and free-form smooth curve)."
+msgstr ""
+
+msgid "Total rise between the garage floor and the street (cm). Can also be passed as the first positional argument."
+msgstr ""
+
+msgid "Horizontal length of the ramp (cm). Can also be passed as the second positional argument."
+msgstr ""
+
+msgid "Ground clearance of the lowest underbody point on flat ground (cm)."
+msgstr ""
+
+msgid "Distance between the front and rear axles (cm)."
+msgstr ""
+
+msgid "Distance from the front axle to the lowest front edge (bumper / lip, cm)."
+msgstr ""
+
+msgid "Distance from the rear axle to the lowest rear edge (cm). Leave at 0 if the rear bumper sits higher than the underbody."
+msgstr ""
+
+msgid "Shortcut: 'ramp_optimizer RISE RUN' is equivalent to -d RISE -l RUN."
+msgstr ""
+
+msgid "Output language for the GUI, the console messages and the blueprint plots ('en' = English, 'es' = Spanish). Default: 'en' (or 'es' if compiled with --spanish)."
+msgstr ""
+
+msgid "--- {name} ---"
+msgstr ""
+
+msgid "Linear ramp (current geometry)"
+msgstr ""
+
+msgid "Optimal three-segment ramp (two arcs + straight)"
+msgstr ""
+
+msgid "Optimal three-slope ramp"
+msgstr ""
+
+msgid "Optimal four-slope ramp"
+msgstr ""
+
+msgid "Optimal smooth ramp (PCHIP monotone spline)"
+msgstr ""
+
+msgid "  worst chassis-between-wheels clearance:    {value}"
+msgstr ""
+
+msgid "  worst overhang (bumper) clearance:         {value}"
+msgstr ""
+
+msgid "      occurs at x = {at_x:6.1f} cm  (rear wheel at x = {at_rear:6.1f} cm)"
+msgstr ""
+
+msgid "  (SCRATCHES)"
+msgstr ""
+
+msgid "  (touching)"
+msgstr ""
+
+msgid "Searching the design space (two arcs + straight) ..."
+msgstr ""
+
+msgid "Best parameters:"
+msgstr ""
+
+msgid "  theta (max slope of the straight middle)  = {deg:.2f} degrees   (tan = {pct:.1f} %)"
+msgstr ""
+
+msgid "  R_bottom (lower-arc radius)               = {value:7.1f} cm"
+msgstr ""
+
+msgid "  R_top    (upper-arc radius)               = {value:7.1f} cm"
+msgstr ""
+
+msgid "  Length of the straight middle (along ramp) = {value:7.1f} cm"
+msgstr ""
+
+msgid "Segment endpoints (cm):"
+msgstr ""
+
+msgid "  start of bottom arc      : x =   0.0,  y =   0.0"
+msgstr ""
+
+msgid "  bottom arc -> straight   : x = {x:5.1f},  y = {y:5.1f}"
+msgstr ""
+
+msgid "  straight -> top arc      : x = {x:5.1f},  y = {y:5.1f}"
+msgstr ""
+
+msgid "  end of top arc           : x = {x:5.1f},  y = {y:5.1f}"
+msgstr ""
+
+msgid "Searching the best three-slope profile ..."
+msgstr ""
+
+msgid "Best parameters (3 slopes):"
+msgstr ""
+
+msgid "  break point 1:  x1 = {x:5.1f} cm,  y1 = {y:5.2f} cm"
+msgstr ""
+
+msgid "  break point 2:  x2 = {x:5.1f} cm,  y2 = {y:5.2f} cm"
+msgstr ""
+
+msgid "  slope 1 (bottom):    {deg:5.2f} degrees ({pct:.1f} %)"
+msgstr ""
+
+msgid "  slope 2 (middle):    {deg:5.2f} degrees ({pct:.1f} %)"
+msgstr ""
+
+msgid "  slope 3 (top):       {deg:5.2f} degrees ({pct:.1f} %)"
+msgstr ""
+
+msgid "  fillet radius at every kink: {fillet:.0f} cm"
+msgstr ""
+
+msgid "Searching in parallel: 4-slope ramp and free-form smooth curve ..."
+msgstr ""
+
+msgid "Best parameters (4 slopes):"
+msgstr ""
+
+msgid "  break point {k}:  x{k} = {x:5.1f} cm,  y{k} = {y:5.2f} cm"
+msgstr ""
+
+msgid "  slope {i}: {deg:5.2f} degrees ({pct:5.1f} %)   length {L:.1f} cm"
+msgstr ""
+
+msgid "Best control points of the smooth curve:"
+msgstr ""
+
+msgid "  {i:>2}  {x:8.1f}  {y:8.2f}  {tag}"
+msgstr ""
+
+msgid "(endpoint)"
+msgstr ""
+
+msgid "Comparison summary (worst scrape, in cm; positive = no scrape):"
+msgstr ""
+
+msgid "Linear ramp (current)"
+msgstr ""
+
+msgid "Two arcs + straight"
+msgstr ""
+
+msgid "Three slopes"
+msgstr ""
+
+msgid "Four slopes"
+msgstr ""
+
+msgid "Free-form smooth curve (PCHIP)"
+msgstr ""
+
+msgid "The current run length leaves some unavoidable scraping."
+msgstr ""
+
+msgid "Sensitivity if the ramp is lengthened (rise stays at {rise:.0f} cm):"
+msgstr ""
+
+msgid "  (chassis = worst between-wheels clearance;"
+msgstr ""
+
+msgid "   bumper  = worst front-overhang / bumper clearance;"
+msgstr ""
+
+msgid "   worst   = the smaller of the two; positive means no scraping.)"
+msgstr ""
+
+msgid "Three-slope key points (mark these on the ground):"
+msgstr ""
+
+msgid "corner"
+msgstr ""
+
+msgid "fillet (R={r:.0f} cm)"
+msgstr ""
+
+msgid "smooth curve (R={r:.0f} cm)"
+msgstr ""
+
+msgid "Construction offsets saved to {path}"
+msgstr ""
+
+msgid "  x = horizontal distance from the start of the ramp"
+msgstr ""
+
+msgid "  y = height above the garage floor"
+msgstr ""
+
+msgid "Construction blueprint saved to {path} (+ PDF: {pdf})"
+msgstr ""
+
+msgid "Construction blueprint (top reference) saved to {path} (+ PDF: {pdf})"
+msgstr ""
+
+msgid "Construction blueprint (cord reference) saved to {path} (+ PDF: {pdf})"
+msgstr ""
+
+msgid "Profile comparison plot saved to ramp_profile.png (+ PDF: {pdf})"
+msgstr ""
+
+msgid "Top-reference cord offsets ({label}) saved to {path}"
+msgstr ""
+
+msgid "Top-reference offsets ({label}) saved to {path}"
+msgstr ""
+
+msgid "Top-reference offsets saved to {path}"
+msgstr ""
+
+msgid "WARNING: PDF '{path}' could not be saved (continuing with the PNG only): {err}"
+msgstr ""
+
+msgid "    run"
+msgstr ""
+
+msgid "chassis"
+msgstr ""
+
+msgid "bumper"
+msgstr ""
+
+msgid "score"
+msgstr ""
+
+msgid "  pt"
+msgstr ""
+
+msgid "what"
+msgstr ""
+
+msgid "x (cm)"
+msgstr ""
+
+msgid "y (cm)"
+msgstr ""
+
+msgid "notes"
+msgstr ""
+
+msgid "True-scale view - garage on the left, street on the right"
+msgstr ""
+
+msgid "u (cm)"
+msgstr ""
+
+msgid "d (cm)"
+msgstr ""
+
+msgid "Side wall (chalk-line reference: {h:.0f} cm above the street)"
+msgstr ""
+
+msgid "Ramp profile to build"
+msgstr ""
+
+msgid "drop {drop:.1f} cm\nfrom wall to {label}"
+msgstr ""
+
+msgid "drop {drop:.1f} cm desde el muro al {label}"
+msgstr ""
+
+msgid "Straight cord (T -> B) reference"
+msgstr ""
+
+msgid "Reference straight cord (length {L:.2f} cm)"
+msgstr ""
+
+msgid "Reference straight cord"
+msgstr ""
+
+msgid "T (street, top)\ns = 0 cm,  p = 0 cm"
+msgstr ""
+
+msgid "B (garage, bottom)\ns = {L:.1f} cm,  p = 0 cm"
+msgstr ""
+
+msgid "Garage floor (flat)"
+msgstr ""
+
+msgid "Street / outside (flat)"
+msgstr ""
+
+msgid "Side wall - use the chalk-line as reference"
+msgstr ""
+
+msgid "Start of the ramp (corner)"
+msgstr ""
+
+msgid "End of the ramp (corner)"
+msgstr ""
+
+msgid "Start of the ramp (by the garage)"
+msgstr ""
+
+msgid "End of the ramp (by the street)"
+msgstr ""
+
+msgid "End of the start fillet"
+msgstr ""
+
+msgid "Start of fillet before kink 1"
+msgstr ""
+
+msgid "Kink 1 (theoretical corner)"
+msgstr ""
+
+msgid "End of fillet after kink 1"
+msgstr ""
+
+msgid "Start of fillet before kink 2"
+msgstr ""
+
+msgid "Kink 2 (theoretical corner)"
+msgstr ""
+
+msgid "End of fillet after kink 2"
+msgstr ""
+
+msgid "Start of fillet at the top"
+msgstr ""
+
+msgid "Kink {i} (corner)"
+msgstr ""
+
+msgid "Reference straight cord (B -> T)"
+msgstr ""
+
+msgid "Ramp profile"
+msgstr ""
+
+msgid "B (garage)"
+msgstr ""
+
+msgid "T (street)"
+msgstr ""
+
+msgid "True-scale view - garage on the left, street on the right. The dashed line is the reference straight cord."
+msgstr ""
+
+msgid "Curve control points"
+msgstr ""
+
+msgid "Stretch a tight straight cord between B (garage) and T (street). Total length = {L:.2f} cm.\ns = distance along the cord measured from T toward B.   p = perpendicular distance from the cord.\np > 0  =  profile ABOVE the cord.   p < 0  =  profile BELOW the cord."
+msgstr ""
+
+msgid "x (cm) - horizontal distance (0 = start of the ramp at the garage)"
+msgstr ""
+
+msgid "y (cm) - height above the garage floor"
+msgstr ""
+
+msgid "s (cm)\nalong cord (from T)"
+msgstr ""
+
+msgid "p (cm)\nperpendicular"
+msgstr ""
+
+msgid "type"
+msgstr ""
+
+msgid "upper station (at T, by the street)"
+msgstr ""
+
+msgid "lower station (at B, by the garage)"
+msgstr ""
+
+msgid "intermediate station"
+msgstr ""
+
+msgid "x (cm) original"
+msgstr ""
+
+msgid "y (cm) original"
+msgstr ""
+
+msgid "Construction blueprint (reference: straight cord T -> B) - {label}  (cord = {L:.2f} cm, rise {rise:.0f} cm, run {run:.0f} cm)"
+msgstr ""
+
+msgid "Height (cm)"
+msgstr ""
+
+msgid "Horizontal distance (cm)"
+msgstr ""
+
+msgid "Rear-wheel position (cm)"
+msgstr ""
+
+msgid "Minimum clearance (cm)\n(negative = scrape)"
+msgstr ""
+
+msgid "worst scrape: {worst:+.2f} cm"
+msgstr ""
+
+msgid "Ramp profile comparison  (rise {rise:.0f} cm, run {run:.0f} cm, ground clearance {clearance:.0f} cm, wheelbase {wheelbase:.0f} cm, front overhang {fo:.0f} cm)"
+msgstr ""
+
+msgid "4-slope ramp"
+msgstr ""
+
+msgid "free-form smooth curve (PCHIP)"
+msgstr ""
+
+msgid "Three-slope ramp"
+msgstr ""
+
+msgid "smooth curve"
+msgstr ""
+
+msgid "Garage Ramp Optimizer"
+msgstr ""
+
+msgid "Author: {name}"
+msgstr ""
+
+msgid "Ramp data"
+msgstr ""
+
+msgid "Car data  (defaults: Seat Leon FR 2025)"
+msgstr ""
+
+msgid "Output folder for the blueprints and CSV files"
+msgstr ""
+
+msgid "Total rise (garage to street):"
+msgstr ""
+
+msgid "Horizontal length of the ramp:"
+msgstr ""
+
+msgid "Ground clearance (on flat):"
+msgstr ""
+
+msgid "Wheelbase (between axles):"
+msgstr ""
+
+msgid "Front overhang (axle to front):"
+msgstr ""
+
+msgid "Rear overhang (0 if it does not scrape):"
+msgstr ""
+
+msgid "Browse..."
+msgstr ""
+
+msgid "Pick the output folder"
+msgstr ""
+
+msgid "Calculate and generate blueprints"
+msgstr ""
+
+msgid "Ready. Enter the data and click Calculate."
+msgstr ""
+
+msgid "Calculation output"
+msgstr ""
+
+msgid "Open output folder"
+msgstr ""
+
+msgid "Close"
+msgstr ""
+
+msgid "Origin (u=0, d=0)\nUpper corner of the ramp\n(where the street begins).\nMeasure u to the left (toward the garage).\nMeasure d downward."
+msgstr ""
+
+msgid "Calculating, please wait (usually 1 to 3 minutes)..."
+msgstr ""
+
+msgid "Preparing the data and the linear reference ramp..."
+msgstr ""
+
+msgid "Elapsed: 0 s   (usually takes between 1 and 3 minutes)"
+msgstr ""
+
+msgid "Elapsed: {elapsed}   (usually takes between 1 and 3 minutes)"
+msgstr ""
+
+msgid "Total time: {total}"
+msgstr ""
+
+msgid "Done. Blueprints and CSV files generated."
+msgstr ""
+
+msgid "Calculation complete"
+msgstr ""
+
+msgid "Blueprints (PNG and PDF) and CSV files saved to:\n\n{folder}"
+msgstr ""
+
+msgid "Error during the calculation."
+msgstr ""
+
+msgid "Error"
+msgstr ""
+
+msgid "Invalid data"
+msgstr ""
+
+msgid "Rise and run must be greater than 0."
+msgstr ""
+
+msgid "Ground clearance and wheelbase must be greater than 0."
+msgstr ""
+
+msgid "'{name}' is empty."
+msgstr ""
+
+msgid "Pick an output folder."
+msgstr ""
+
+msgid "Cannot create the output folder:\n{err}"
+msgstr ""
+
+msgid "The folder does not exist."
+msgstr ""
+
+msgid "Cannot open the folder:\n{err}"
+msgstr ""
+
+msgid "Extreme grade"
+msgstr ""
+
+msgid "Rise ({rise:.0f} cm) is greater than or equal to run ({run:.0f} cm).\nThat is a grade >= 100 % (45 degrees or more), unrealistic for a car.\n\nDo you want to continue anyway?"
+msgstr ""
+
+msgid "Slope 1 (bottom)"
+msgstr ""
+
+msgid "Slope 2 (middle)"
+msgstr ""
+
+msgid "Slope 3 (top)"
+msgstr ""
+
+msgid "Slope {i}"
+msgstr ""
+
+msgid "Slope 1 (near the garage / bottom)"
+msgstr ""
+
+msgid "Slope {n} (near the street / top)"
+msgstr ""
+
+msgid "Slope {n} (middle)"
+msgstr ""
+
+msgid "Slope 3 (near the street / top)"
+msgstr ""
+
+msgid "{name}\n{deg:.2f} degrees ({pct:.1f} %)\nlength along plane = {L:.1f} cm"
+msgstr ""
+
+msgid "Round every kink with a smooth curve of radius R = {fillet:.0f} cm.   The square markers show where each curve starts and ends."
+msgstr ""
+
+msgid "Slopes meet directly at the marked points (sharp corners).   No fillet needed."
+msgstr ""
+
+msgid "Round every kink with a smooth curve\nof radius R = {fillet:.0f} cm.\nThe square markers show where each\ncurve starts and ends."
+msgstr ""
+
+msgid "Slopes meet directly at the marked points\n(sharp corners).\nNo fillet needed."
+msgstr ""
+
+msgid "Origin (0, 0)\nMeasure x horizontally\nfrom here.\nMeasure y vertically."
+msgstr ""
+
+msgid "True-scale view (1 cm vertical = 1 cm horizontal)"
+msgstr ""
+
+msgid "Working drawing (vertical scale exaggerated for clarity) - use the (x, y) numbers, not the visual proportions"
+msgstr ""
+
+msgid "Construction blueprint - 3-slope ramp  (rise {rise:.0f} cm, run {run:.0f} cm)"
+msgstr ""
+
+msgid "x  (cm, horizontal - 0 at the start of the ramp)"
+msgstr ""
+
+msgid "y  (cm, height above the garage floor)"
+msgstr ""
+
+msgid "Side wall ({h:.0f} cm above the street)"
+msgstr ""
+
+msgid "u (cm) - distance from the top edge (growing toward the garage)"
+msgstr ""
+
+msgid "d (cm) - depth below the top plane"
+msgstr ""
+
+msgid "drop {drop:.1f} cm\nfrom the wall to {label}"
+msgstr ""
+
+msgid "start (garage floor)"
+msgstr ""
+
+msgid "end (street)"
+msgstr ""
+
+msgid "u  (cm, distance from the top edge - growing toward the garage, on the left)"
+msgstr ""
+
+msgid "d  (cm, depth below the top plane - negative = above)"
+msgstr ""
+
+msgid "Working drawing - garage on the left, street on the right  (vertical scale exaggerated for clarity)"
+msgstr ""
+
+msgid "Construction blueprint (reference: wall and top plane) - 3-slope ramp  (rise {rise:.0f} cm, run {run:.0f} cm)"
+msgstr ""
+
+msgid "Construction blueprint (reference: wall and top plane) - {label}  (rise {rise:.0f} cm, run {run:.0f} cm)"
+msgstr ""
+
+msgid "Construction blueprint (reference: wall and top plane) - {label}  (rise {rise:.0f} cm, run {run:.0f} cm, stations every {step:.0f} cm)"
+msgstr ""
+
+msgid "u (cm)\nto the top edge"
+msgstr ""
+
+msgid "d (cm)\nbelow the top plane"
+msgstr ""
+
+msgid "drop (cm)\nfrom the wall"
+msgstr ""
+
+msgid "drop (cm)"
+msgstr ""
+
+msgid "Working drawing - {label} - garage on the left, street on the right  (vertical scale exaggerated for clarity)"
+msgstr ""
+
+msgid "Continuous curve: mark a station every {step:.0f} cm along the wall and measure the indicated drop."
+msgstr ""
+
+msgid "Curve control points (informative):"
+msgstr ""
+
+msgid "upper station (by the street)"
+msgstr ""
+
+msgid "lower station (by the garage)"
+msgstr ""
+
+msgid "Side wall (chalk-line reference)"
+msgstr ""
+
+msgid "smooth"
+msgstr ""
+
+msgid "4 slopes"
+msgstr ""
+
+msgid "profile"
+msgstr ""
+
+msgid "Rise"
+msgstr ""
+
+msgid "Run"
+msgstr ""
+
+msgid "Ground clearance"
+msgstr ""
+
+msgid "Wheelbase"
+msgstr ""
+
+msgid "Front overhang"
+msgstr ""
+
+msgid "Rear overhang"
+msgstr ""
+
+msgid "Optimizing: two arcs + straight..."
+msgstr ""
+
+msgid "Optimizing: three slopes..."
+msgstr ""
+
+msgid "Generating first blueprint (3 slopes)..."
+msgstr ""
+
+msgid "Optimizing in parallel: 4 slopes and free-form smooth (longest step)..."
+msgstr ""
+
+msgid "4 slopes done. Waiting for the smooth curve..."
+msgstr ""
+
+msgid "Generating 4-slope blueprints..."
+msgstr ""
+
+msgid "Generating smooth-curve blueprints..."
+msgstr ""
+
+msgid "Generating cord-reference blueprints..."
+msgstr ""
+
+msgid "Generating top-reference 3-slope blueprint..."
+msgstr ""
+
+msgid "Computing sensitivity to ramp length..."
+msgstr ""
+
+msgid "Done. Blueprints and CSVs generated."
+msgstr ""
