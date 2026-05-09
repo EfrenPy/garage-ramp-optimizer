@@ -150,10 +150,14 @@ def main() -> None:
         "--name", "rampa",
         "--noconfirm",
         "--clean",
-        # scipy and matplotlib load some modules dynamically; these flags
-        # make sure PyInstaller bundles them all.
+        # scipy loads some modules dynamically; this flag makes sure
+        # PyInstaller bundles them all.  We explicitly enumerate the
+        # matplotlib backends we use further below instead of relying
+        # on ``--collect-submodules matplotlib.backends``: that crawl
+        # pulls in every Qt / GTK / wx backend matplotlib ships and
+        # then fires a noisy "no Qt bindings are available" warning,
+        # even though we never use any of those backends.
         "--collect-submodules", "scipy",
-        "--collect-submodules", "matplotlib.backends",
         "--collect-data", "matplotlib",
         # Specific backends.  Without these matplotlib's lazy import of
         # backend_pdf would fail at runtime.  backend_tkagg is needed by
@@ -168,6 +172,37 @@ def main() -> None:
         "--hidden-import", "tkinter.ttk",
         "--hidden-import", "tkinter.filedialog",
         "--hidden-import", "tkinter.messagebox",
+        # Drop modules that PyInstaller's stale hooks reference but the
+        # installed packages no longer ship, plus heavyweight optional
+        # backends (PyTorch, Qt, GTK, wx, macOS) that we never use.
+        # Each --exclude-module silences a corresponding WARNING in the
+        # build log without touching runtime behaviour.
+        "--exclude-module", "torch",
+        "--exclude-module", "scipy._lib.array_api_compat.torch",
+        "--exclude-module", "scipy.special._cdflib",
+        "--exclude-module", "PyQt5",
+        "--exclude-module", "PyQt6",
+        "--exclude-module", "PySide2",
+        "--exclude-module", "PySide6",
+        "--exclude-module", "matplotlib.backends.qt_compat",
+        "--exclude-module", "matplotlib.backends.qt_editor",
+        "--exclude-module", "matplotlib.backends.backend_qt",
+        "--exclude-module", "matplotlib.backends.backend_qtagg",
+        "--exclude-module", "matplotlib.backends.backend_qtcairo",
+        "--exclude-module", "matplotlib.backends.backend_qt5",
+        "--exclude-module", "matplotlib.backends.backend_qt5agg",
+        "--exclude-module", "matplotlib.backends.backend_qt5cairo",
+        "--exclude-module", "matplotlib.backends.backend_gtk3",
+        "--exclude-module", "matplotlib.backends.backend_gtk3agg",
+        "--exclude-module", "matplotlib.backends.backend_gtk3cairo",
+        "--exclude-module", "matplotlib.backends.backend_gtk4",
+        "--exclude-module", "matplotlib.backends.backend_gtk4agg",
+        "--exclude-module", "matplotlib.backends.backend_gtk4cairo",
+        "--exclude-module", "matplotlib.backends.backend_wx",
+        "--exclude-module", "matplotlib.backends.backend_wxagg",
+        "--exclude-module", "matplotlib.backends.backend_wxcairo",
+        "--exclude-module", "matplotlib.backends.backend_macosx",
+        "--exclude-module", "matplotlib.backends.backend_nbagg",
     ]
 
     # Custom application icon, when present (only matters on Windows
