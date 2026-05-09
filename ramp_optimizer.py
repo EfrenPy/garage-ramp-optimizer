@@ -2738,6 +2738,42 @@ def write_offsets(path, x, y, n=28):
 
 
 # --------------------------------------------------------------------------- #
+#  Concrete-volume cost estimator
+# --------------------------------------------------------------------------- #
+def concrete_volume_m3(x_curve, y_curve, ramp_width_cm: float) -> float:
+    """Volume of concrete (in m^3) needed to pour a slab whose top
+    surface follows ``(x_curve, y_curve)``, sitting on a flat garage
+    floor at y = 0.
+
+    The slab cross-section under the surface is the area
+    ``int_0^run y(x) dx`` (cm^2); multiplying by the ramp width
+    (also in cm) and dividing by 10^6 gives cubic metres.
+    """
+    if ramp_width_cm <= 0:
+        return 0.0
+    x = np.asarray(x_curve, dtype=float)
+    y = np.asarray(y_curve, dtype=float)
+    order = np.argsort(x)
+    x = x[order]
+    y = y[order]
+    area_cm2 = float(np.trapz(np.maximum(y, 0.0), x))
+    return area_cm2 * ramp_width_cm / 1_000_000.0
+
+
+def linear_volume_m3(ramp: Ramp, ramp_width_cm: float) -> float:
+    """Reference volume for the straight (linear) ramp baseline."""
+    if ramp_width_cm <= 0:
+        return 0.0
+    area_cm2 = 0.5 * ramp.rise * ramp.run
+    return area_cm2 * ramp_width_cm / 1_000_000.0
+
+
+def fmt_currency(value: float, symbol: str = "EUR") -> str:
+    """Display a monetary amount with thousand separators."""
+    return f"{value:,.2f} {symbol}"
+
+
+# --------------------------------------------------------------------------- #
 def sensitivity(car: Car, base_ramp: Ramp, runs):
     """For a list of candidate runs, optimise the ramp and report the
     worst-case clearance.  Useful when you can extend the slope into
@@ -2779,7 +2815,7 @@ def _ask_float(prompt: str, default: float | None = None,
         return value
 
 
-def parse_inputs() -> tuple["Ramp", "Car"]:
+def parse_inputs() -> tuple["Ramp", "Car", float, float, str]:
     """
     Reads the ramp and car parameters from the command line, or asks for
     them on the console if missing.
@@ -2832,6 +2868,23 @@ def parse_inputs() -> tuple["Ramp", "Car"]:
         help=t("Distance from the rear axle to the lowest rear edge "
                 "(cm). Leave at 0 if the rear bumper sits higher than "
                 "the underbody."),
+    )
+    parser.add_argument(
+        "--width", "--ramp-width", dest="ramp_width", type=float, default=0.0,
+        help=t("Ramp width in cm (perpendicular to the slope direction). "
+                "Used only by the optional concrete-volume cost estimator. "
+                "Leave at 0 to skip the cost report."),
+    )
+    parser.add_argument(
+        "--cost-per-m3", dest="cost_per_m3", type=float, default=0.0,
+        help=t("Cost per cubic metre of concrete in your currency, used "
+                "by the optional cost estimator.  Leave at 0 to print "
+                "only the volumes."),
+    )
+    parser.add_argument(
+        "--currency", dest="currency", type=str, default="EUR",
+        help=t("Currency symbol shown next to the estimated cost "
+                "(e.g. EUR, USD, GBP)."),
     )
     parser.add_argument(
         "--lang", choices=["en", "es"], default=None,
@@ -2912,16 +2965,24 @@ def parse_inputs() -> tuple["Ramp", "Car"]:
         rear_overhang=args.rear_overhang,
     )
     ramp = Ramp(rise=args.desnivel, run=args.longitud)
-    return ramp, car
+    return ramp, car, args.ramp_width, args.cost_per_m3, args.currency
 
 
 def main() -> None:
     """Punto de entrada CLI: lee parametros y llama a compute_and_save."""
-    ramp, car = parse_inputs()
-    compute_and_save(ramp, car)
+    ramp, car, ramp_width, cost_per_m3, currency = parse_inputs()
+    compute_and_save(ramp, car,
+                     ramp_width_cm=ramp_width,
+                     cost_per_m3=cost_per_m3,
+                     currency=currency)
 
 
-def compute_and_save(ramp: "Ramp", car: "Car") -> None:
+def compute_and_save(
+    ramp: "Ramp", car: "Car",
+    ramp_width_cm: float = 0.0,
+    cost_per_m3: float = 0.0,
+    currency: str = "EUR",
+) -> None:
     """Run every search, generate every file (PNG, PDF, CSV) in the
     current working directory.  Called from both the CLI and the GUI."""
     grade_pct = 100.0 * ramp.rise / ramp.run
@@ -3196,6 +3257,44 @@ def compute_and_save(ramp: "Ramp", car: "Car") -> None:
         sc = min(ch, ov)
         print(f"  {label:<32}  {ch:+8.2f}  {ov:+9.2f}  {sc:+8.2f}")
     print()
+
+    # ---- Optional concrete-volume / cost summary ------------------------ #
+    if ramp_width_cm > 0:
+        v_lin = linear_volume_m3(ramp, ramp_width_cm)
+        print(t("Concrete-volume estimate (ramp width: {w:.0f} cm; "
+                "slab from the floor up to the surface):").format(
+            w=ramp_width_cm,
+        ))
+        head_profile = "profile" if LANGUAGE == "en" else "perfil"
+        head_volume  = t("volume (m^3)").rjust(13)
+        head_delta   = t("delta vs linear (m^3)").rjust(22)
+        head_cost    = (t("cost ({sym})").format(sym=currency).rjust(14)
+                        if cost_per_m3 > 0 else "")
+        print(f"  {head_profile:<32}  {head_volume}  {head_delta}"
+              f"  {head_cost}")
+        # Linear baseline first.
+        cost_lin_str = (fmt_currency(v_lin * cost_per_m3, currency).rjust(14)
+                        if cost_per_m3 > 0 else "")
+        print(f"  {t('Linear ramp (current)'):<32}  "
+              f"{v_lin:13.3f}  "
+              f"{0.0:22.3f}"
+              + (f"  {cost_lin_str}" if cost_per_m3 > 0 else ""))
+        for label, m in candidates[1:]:  # skip the duplicate linear entry
+            v = concrete_volume_m3(m["x"], m["y"], ramp_width_cm)
+            delta = v - v_lin
+            row_cost = ""
+            if cost_per_m3 > 0:
+                row_cost = ("  " + fmt_currency(v * cost_per_m3, currency)
+                                              .rjust(14))
+            print(f"  {label:<32}  {v:13.3f}  {delta:+22.3f}{row_cost}")
+        print(t("  (positive 'delta' = more concrete than the linear "
+                "baseline)"))
+        if cost_per_m3 > 0:
+            print(t("  (rate used: {rate:.2f} {sym} per m^3)").format(
+                rate=cost_per_m3, sym=currency,
+            ))
+        print()
+
     # 3-slope blueprint with the wall / top-of-ramp reference.
     # Default wall height: 136 cm above the upper flat (street).
     WALL_OFFSET_OVER_TOP = 136.0
@@ -3627,6 +3726,41 @@ def launch_gui() -> None:
     voladizo_t_var = _entry(car_frame, 3,
                               t("Rear overhang (0 if it does not scrape):"), 0)
 
+    # ---- Concrete cost estimator (optional) ---------------------------- #
+    # Both fields are optional: leave them empty to skip the cost report.
+    cost_frame = ttk.LabelFrame(
+        root,
+        text=t("Concrete cost estimator (optional)"),
+        padding=10,
+    )
+    cost_frame.pack(fill="x", padx=14, pady=4)
+
+    ttk.Label(cost_frame, text=t("Ramp width:")).grid(
+        row=0, column=0, sticky="e", padx=6, pady=4)
+    ramp_width_var = tk.StringVar(value="")
+    ttk.Entry(cost_frame, textvariable=ramp_width_var,
+              width=10, justify="right").grid(
+        row=0, column=1, sticky="w", padx=4, pady=4)
+    ttk.Label(cost_frame, text="cm").grid(
+        row=0, column=2, sticky="w", padx=2, pady=4)
+
+    ttk.Label(cost_frame, text=t("Concrete cost per m^3:")).grid(
+        row=1, column=0, sticky="e", padx=6, pady=4)
+    cost_var = tk.StringVar(value="")
+    ttk.Entry(cost_frame, textvariable=cost_var,
+              width=10, justify="right").grid(
+        row=1, column=1, sticky="w", padx=4, pady=4)
+
+    currency_var = tk.StringVar(value="EUR")
+    ttk.Entry(cost_frame, textvariable=currency_var,
+              width=6, justify="left").grid(
+        row=1, column=2, sticky="w", padx=2, pady=4)
+    ttk.Label(
+        cost_frame,
+        text=t("(leave width or cost empty to skip the cost report)"),
+        font=SMALL_FONT, foreground="#666",
+    ).grid(row=2, column=0, columnspan=3, sticky="w", padx=6, pady=(2, 0))
+
     # ---- Output folder -------------------------------------------------- #
     folder_frame = ttk.LabelFrame(
         root, text=t("Output folder for the blueprints and CSV files"),
@@ -3795,7 +3929,7 @@ def launch_gui() -> None:
         def flush(self) -> None:
             return
 
-    def _worker(ramp, car, out_dir):
+    def _worker(ramp, car, out_dir, ramp_width, cost_per_m3, currency):
         try:
             cwd = os.getcwd()
             os.chdir(out_dir)
@@ -3803,7 +3937,12 @@ def launch_gui() -> None:
                 stream = _GuiStream()
                 with contextlib.redirect_stdout(stream), \
                      contextlib.redirect_stderr(stream):
-                    compute_and_save(ramp, car)
+                    compute_and_save(
+                        ramp, car,
+                        ramp_width_cm=ramp_width,
+                        cost_per_m3=cost_per_m3,
+                        currency=currency,
+                    )
             finally:
                 os.chdir(cwd)
             msg_q.put(("done", ""))
@@ -3906,6 +4045,12 @@ def launch_gui() -> None:
             batalla = _read_float(batalla_var, t("Wheelbase"))
             voladizo_d = _read_float(voladizo_d_var, t("Front overhang"))
             voladizo_t = _read_float(voladizo_t_var, t("Rear overhang"))
+            # Cost-estimator inputs are optional: blank means "skip".
+            ramp_width_v = (_read_float(ramp_width_var, t("Ramp width"))
+                            if ramp_width_var.get().strip() else 0.0)
+            cost_v = (_read_float(cost_var, t("Cost per m^3"))
+                      if cost_var.get().strip() else 0.0)
+            currency_v = (currency_var.get().strip() or "EUR")
         except ValueError as e:
             messagebox.showerror(t("Invalid data"), str(e))
             return
@@ -3966,7 +4111,9 @@ def launch_gui() -> None:
         root.after(1000, _tick_elapsed)
 
         thread = threading.Thread(
-            target=_worker, args=(ramp, car, out_dir), daemon=True,
+            target=_worker,
+            args=(ramp, car, out_dir, ramp_width_v, cost_v, currency_v),
+            daemon=True,
         )
         thread.start()
         root.after(150, _drain_queue)
