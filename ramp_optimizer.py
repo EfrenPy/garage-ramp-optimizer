@@ -114,7 +114,7 @@ import csv
 import math
 import os
 import sys
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
 
 # Pin numerical-library thread counts BEFORE importing numpy/scipy so the
@@ -2944,10 +2944,49 @@ def compute_and_save(ramp: "Ramp", car: "Car") -> None:
                        n_positions=3000, n_chassis=400)
     report(t("Linear ramp (current geometry)"), res_lin)
 
+    # ---- All optimizations in parallel ---------------------------------- #
+    # Every search is independent of the others, so we fan them out over
+    # up to 4 worker processes and gather the results before printing the
+    # full report.  This keeps wall-clock time roughly equal to the longest
+    # single search (the smooth PCHIP optimisation) instead of the sum of
+    # all four.
+    print(t("Searching all profiles in parallel "
+            "(2-arc, 3-slope, 4-slope, smooth) ..."))
+    best4 = None
+    best_smooth = None
+    parallel_jobs = [
+        ("arc", search, (ramp, car)),
+        ("three", search_three_slope, (ramp, car, 11, 0.0)),
+    ]
+    if HAS_SCIPY:
+        parallel_jobs.append(("four", search_n_slope, (ramp, car, 4, 0.0)))
+        parallel_jobs.append(("smooth", search_smooth, (ramp, car, 5)))
+    job_label = {
+        "arc":    t("two arcs + straight"),
+        "three":  t("three slopes"),
+        "four":   t("four slopes"),
+        "smooth": t("free-form smooth (PCHIP)"),
+    }
+    results = {}
+    with ProcessPoolExecutor(max_workers=len(parallel_jobs)) as pool:
+        future_to_key = {
+            pool.submit(fn, *args): key
+            for key, fn, args in parallel_jobs
+        }
+        for fut in as_completed(future_to_key):
+            key = future_to_key[fut]
+            results[key] = fut.result()
+            print(t("  ... {name}: done.").format(name=job_label[key]))
+    print()
+
+    best = results["arc"]
+    best3 = results["three"]
+    if HAS_SCIPY:
+        best4 = results["four"]
+        best_smooth = results["smooth"]
+
     # ---- Two arcs + straight middle ------------------------------------- #
-    print(t("Searching the design space (two arcs + straight) ..."))
-    best = search(ramp, car)
-    print(t("Best parameters:"))
+    print(t("Best parameters (two arcs + straight):"))
     print(t("  theta (max slope of the straight middle)  = {deg:.2f} "
             "degrees   (tan = {pct:.1f} %)").format(
         deg=best["theta_deg"], pct=math.tan(best["theta"]) * 100,
@@ -2973,8 +3012,6 @@ def compute_and_save(ramp: "Ramp", car: "Car") -> None:
     write_offsets(_output_name("csv_2arc", ".csv"), best["x"], best["y"])
 
     # ---- 3 piecewise-linear slopes -------------------------------------- #
-    print(t("Searching the best three-slope profile ..."))
-    best3 = search_three_slope(ramp, car, n_grid=11, fillet=0.0)
     print(t("Best parameters (3 slopes):"))
     print(t("  break point 1:  x1 = {x:5.1f} cm,  y1 = {y:5.2f} cm"
             ).format(x=best3["x1"], y=best3["y1"]))
@@ -2996,18 +3033,8 @@ def compute_and_save(ramp: "Ramp", car: "Car") -> None:
     write_offsets(_output_name("csv_3slope", ".csv"), best3["x"], best3["y"], n=28)
     draw_three_slope_blueprint(ramp, best3, _output_name("blueprint_3slope", ".png"))
 
-    # ---- 4 slopes + free-form smooth curve (parallel) ------------------- #
-    best4 = None
-    best_smooth = None
+    # ---- 4 slopes + free-form smooth curve ------------------------------ #
     if HAS_SCIPY:
-        print(t("Searching in parallel: 4-slope ramp and free-form smooth "
-                "curve ..."))
-        with ProcessPoolExecutor(max_workers=2) as pool:
-            fut4 = pool.submit(search_n_slope, ramp, car, 4, 0.0)
-            fut_smooth = pool.submit(search_smooth, ramp, car, 5)
-            best4 = fut4.result()
-            best_smooth = fut_smooth.result()
-
         print(t("Best parameters (4 slopes):"))
         for k, (xb, yb) in enumerate(best4["breaks"], start=1):
             print(t("  break point {k}:  x{k} = {x:5.1f} cm,  "
@@ -3417,26 +3444,60 @@ def launch_gui() -> None:
 
     root = tk.Tk()
     root.title(t("Garage Ramp Optimizer"))
-    root.geometry("820x820")
+
+    # Responsive window: target a comfortable size, but never larger than
+    # ~92 % of the available screen so the window always fits.  A minsize
+    # keeps the controls usable when the user shrinks the window.
+    sw = root.winfo_screenwidth()
+    sh = root.winfo_screenheight()
+    target_w = min(960, max(720, int(sw * 0.92)))
+    target_h = min(960, max(620, int(sh * 0.90)))
+    pos_x = max(0, (sw - target_w) // 2)
+    pos_y = max(0, (sh - target_h) // 2 - 24)
+    root.geometry(f"{target_w}x{target_h}+{pos_x}+{pos_y}")
+    root.minsize(640, 560)
+
+    # Slightly larger Tk scaling so every widget (including dialogs and
+    # menus that ttk does not theme) renders at a comfortable size on
+    # both standard- and high-DPI screens.
     try:
-        root.tk.call("tk", "scaling", 1.1)
+        root.tk.call("tk", "scaling", 1.30)
     except tk.TclError:
         pass
+
+    # Base font sizes used everywhere in the GUI.  Bumping these is the
+    # single knob that makes every label / entry / button text larger.
+    BASE_FONT      = ("Segoe UI", 12)
+    BASE_FONT_BOLD = ("Segoe UI", 12, "bold")
+    SMALL_FONT     = ("Segoe UI", 11)
+    HEADER_FONT    = ("Segoe UI", 20, "bold")
+    MONO_FONT      = ("Consolas", 11)
+
     style = ttk.Style(root)
     if "vista" in style.theme_names():
         style.theme_use("vista")
     elif "clam" in style.theme_names():
         style.theme_use("clam")
+    # Make every ttk widget pick up the larger base font.  We cover the
+    # specific styles we use in addition to the catch-all "." pattern,
+    # because some platforms (notably the "vista" theme on Windows) ignore
+    # the catch-all for certain widgets.
+    style.configure(".", font=BASE_FONT)
+    style.configure("TLabel", font=BASE_FONT)
+    style.configure("TLabelframe.Label", font=BASE_FONT_BOLD)
+    style.configure("TButton", font=BASE_FONT)
+    style.configure("TEntry", font=BASE_FONT)
+    style.configure("TCheckbutton", font=BASE_FONT)
 
     # ---- Header --------------------------------------------------------- #
     header = ttk.Frame(root, padding=(14, 12, 14, 4))
     header.pack(fill="x")
     ttk.Label(header, text=t("Garage Ramp Optimizer"),
-              font=("Segoe UI", 16, "bold")).pack(anchor="w")
+              font=HEADER_FONT).pack(anchor="w")
     ttk.Label(header, text=t("Author: {name}").format(name=AUTHOR),
-              font=("Segoe UI", 10)).pack(anchor="w", pady=(4, 0))
+              font=BASE_FONT).pack(anchor="w", pady=(4, 0))
     link = tk.Label(header, text=URL, fg="#1565c0", cursor="hand2",
-                    font=("Segoe UI", 10, "underline"))
+                    font=("Segoe UI", 12, "underline"))
     link.pack(anchor="w")
     link.bind("<Button-1>", lambda _e: webbrowser.open(URL))
 
@@ -3510,31 +3571,43 @@ def launch_gui() -> None:
     progress.pack(side="left", padx=10)
     pct_var = tk.StringVar(value="0 %")
     ttk.Label(action_frame, textvariable=pct_var,
-              font=("Segoe UI", 10, "bold")).pack(side="left", padx=(0, 12))
+              font=BASE_FONT_BOLD).pack(side="left", padx=(0, 12))
     status_var = tk.StringVar(
         value=t("Ready. Enter the data and click Calculate."))
     ttk.Label(action_frame, textvariable=status_var,
-              font=("Segoe UI", 10, "italic")).pack(side="left")
+              font=("Segoe UI", 12, "italic")).pack(side="left")
 
     # Elapsed-time line.
     time_frame = ttk.Frame(root, padding=(14, 0))
     time_frame.pack(fill="x")
     time_var = tk.StringVar(value="")
     ttk.Label(time_frame, textvariable=time_var,
-              font=("Segoe UI", 9), foreground="#444").pack(anchor="w")
+              font=SMALL_FONT, foreground="#444").pack(anchor="w")
 
     # ---- Output text area ---------------------------------------------- #
+    # The text widget uses both vertical and horizontal scrollbars so the
+    # tabular output never gets clipped if the window is shrunk to a
+    # narrow size.  ``wrap="none"`` preserves the column alignment of the
+    # numerical reports.
     results_frame = ttk.LabelFrame(root, text=t("Calculation output"),
                                      padding=4)
     results_frame.pack(fill="both", expand=True, padx=14, pady=(4, 8))
-    txt_scroll = ttk.Scrollbar(results_frame)
-    txt_scroll.pack(side="right", fill="y")
+    results_frame.rowconfigure(0, weight=1)
+    results_frame.columnconfigure(0, weight=1)
+
+    txt_scroll_y = ttk.Scrollbar(results_frame, orient="vertical")
+    txt_scroll_x = ttk.Scrollbar(results_frame, orient="horizontal")
     results_text = tk.Text(
-        results_frame, font=("Consolas", 9),
-        yscrollcommand=txt_scroll.set, wrap="none", height=18,
+        results_frame, font=MONO_FONT,
+        yscrollcommand=txt_scroll_y.set,
+        xscrollcommand=txt_scroll_x.set,
+        wrap="none", height=18,
     )
-    results_text.pack(fill="both", expand=True)
-    txt_scroll.config(command=results_text.yview)
+    results_text.grid(row=0, column=0, sticky="nsew")
+    txt_scroll_y.grid(row=0, column=1, sticky="ns")
+    txt_scroll_x.grid(row=1, column=0, sticky="ew")
+    txt_scroll_y.config(command=results_text.yview)
+    txt_scroll_x.config(command=results_text.xview)
 
     # ---- Bottom buttons ------------------------------------------------ #
     bottom = ttk.Frame(root, padding=(14, 4, 14, 12))
@@ -3573,41 +3646,52 @@ def launch_gui() -> None:
         return t(en)
 
     STAGES = [
-        (_trig("Searching the design space (two arcs + straight) ..."),
-         3,  t("Optimizing: two arcs + straight...")),
-        (_trig("Optimal three-segment ramp (two arcs + straight)"),
-         8,  t("Optimizing: three slopes...")),
-        (_trig("Searching the best three-slope profile ..."),
-         10, t("Optimizing: three slopes...")),
-        (_trig("Optimal three-slope ramp"),
-         15, t("Generating first blueprint (3 slopes)...")),
-        (_trig("Searching in parallel: 4-slope ramp and free-form smooth "
-                 "curve ..."),
-         18, t("Optimizing in parallel: 4 slopes and free-form smooth "
+        (_trig("Searching all profiles in parallel "
+                 "(2-arc, 3-slope, 4-slope, smooth) ..."),
+         5,  t("Optimizing all profiles in parallel "
                 "(longest step)...")),
+        (_trig("Optimal three-segment ramp (two arcs + straight)"),
+         62, t("Generating first blueprint (3 slopes)...")),
+        (_trig("Optimal three-slope ramp"),
+         66, t("Generating 4-slope blueprints...")),
         (_trig("Optimal four-slope ramp"),
-         55, t("4 slopes done. Waiting for the smooth curve...")),
+         70, t("Generating smooth-curve blueprints...")),
         (_trig("Optimal smooth ramp (PCHIP monotone spline)"),
-         70, t("Generating 4-slope blueprints...")),
+         74, t("Generating top-reference blueprints...")),
         # The blueprint-progress triggers below match the basename of
         # each generated file; the names switch with the active language
         # (see _OUTPUT_NAMES_*), so we resolve them through
         # ``_output_name`` instead of hard-coding the English strings.
         (_output_name("blueprint_4slope_top", ""),
-         76, t("Generating smooth-curve blueprints...")),
+         78, t("Generating smooth-curve blueprints...")),
         (_output_name("blueprint_smooth_top", ""),
-         80, t("Generating cord-reference blueprints...")),
+         82, t("Generating cord-reference blueprints...")),
         (_output_name("blueprint_4slope_chord", ""),
-         83, t("Generating cord-reference blueprints...")),
+         85, t("Generating cord-reference blueprints...")),
         (_output_name("blueprint_smooth_chord", ""),
-         86, t("Generating top-reference 3-slope blueprint...")),
+         88, t("Generating top-reference 3-slope blueprint...")),
         (_output_name("blueprint_3slope_top", ".png"),
-         88, t("Computing sensitivity to ramp length...")),
-        (_trig("Sensitivity if the ramp is lengthened"),
          90, t("Computing sensitivity to ramp length...")),
+        (_trig("Sensitivity if the ramp is lengthened"),
+         92, t("Computing sensitivity to ramp length...")),
         (_output_name("blueprint_compare", ".png"),
          100, t("Done. Blueprints and CSVs generated.")),
     ]
+
+    # Parallel-search completion triggers (any order, each fires once).
+    # We bump the bar by a fixed amount per completion so the user gets
+    # incremental feedback during the long parallel block.
+    parallel_done_triggers = [
+        ("  ... " + t("two arcs + straight") + ": done.",
+         t("two arcs + straight: done.  Waiting for the rest...")),
+        ("  ... " + t("three slopes") + ": done.",
+         t("three slopes: done.  Waiting for the rest...")),
+        ("  ... " + t("four slopes") + ": done.",
+         t("four slopes: done.  Waiting for the rest...")),
+        ("  ... " + t("free-form smooth (PCHIP)") + ": done.",
+         t("free-form smooth (PCHIP): done.")),
+    ]
+    parallel_done_remaining = list(parallel_done_triggers)
     current_stage = [0]
     start_time = [None]    # type: list
 
@@ -3672,8 +3756,15 @@ def launch_gui() -> None:
                 if kind == "log":
                     results_text.insert("end", payload)
                     results_text.see("end")
-                    # Advance the progress bar when the next expected
-                    # trigger substring shows up.
+                    # Parallel-search completion triggers fire in any
+                    # order; bump the bar a bit each time one is matched.
+                    for ptrig in list(parallel_done_remaining):
+                        if ptrig[0] in payload:
+                            cur = int(progress["value"])
+                            _set_progress(min(cur + 12, 60), ptrig[1])
+                            parallel_done_remaining.remove(ptrig)
+                    # Advance the ordered progress bar when the next
+                    # expected trigger substring shows up.
                     while current_stage[0] < len(STAGES):
                         trigger, pct, msg = STAGES[current_stage[0]]
                         if trigger in payload:
@@ -3775,6 +3866,7 @@ def launch_gui() -> None:
 
         results_text.delete("1.0", "end")
         current_stage[0] = 0
+        parallel_done_remaining[:] = list(parallel_done_triggers)
         _set_progress(1,
                        t("Preparing the data and the linear reference "
                          "ramp..."))
