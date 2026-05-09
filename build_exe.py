@@ -231,6 +231,18 @@ def main() -> None:
 
     # 1) Ensure dependencies.
     print("Step 1: ensuring required dependencies are installed...")
+    # Install everything from requirements.txt so the pinned scipy
+    # range (and any other version constraints) are honored on local
+    # builds, not just on the GitHub Actions release pipeline.  We
+    # still call ``ensure_package`` afterwards as a belt-and-braces
+    # check that imports succeed before the PyInstaller step.
+    requirements_file = PROJECT_DIR / "requirements.txt"
+    if requirements_file.exists():
+        print(f"... installing pinned versions from {requirements_file} ...")
+        run([
+            sys.executable, "-m", "pip", "install",
+            "--upgrade", "-r", str(requirements_file),
+        ])
     ensure_package("numpy")
     ensure_package("scipy")
     ensure_package("matplotlib")

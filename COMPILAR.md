@@ -35,7 +35,16 @@ interpreter and every dependency inside the `.exe`, so there is no
      `--es` is a short alias.
 
    The first run will pip-install `numpy`, `scipy`, `matplotlib` and
-   `pyinstaller`. Expect it to take a couple of minutes.
+   `pyinstaller` straight from `requirements.txt`. Expect it to take a
+   couple of minutes.
+
+   > **Note**: `scipy` is pinned to `>=1.10,<1.12` in `requirements.txt`.
+   > Newer scipy releases changed the differential-evolution
+   > implementation enough that the smooth-curve search lands on a
+   > worse local optimum (about a 7 mm scrape instead of 1.4 mm) on
+   > the default Seat Leon geometry.  If you already have a newer
+   > scipy installed system-wide, the build script will downgrade it
+   > inside this project's environment for you.
 
 4. When it finishes you will see a banner that reads
    **`OK. Executable created [English UI]:`** (or `[Spanish UI]`) and

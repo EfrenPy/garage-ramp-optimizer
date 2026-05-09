@@ -1,7 +1,17 @@
 # Runtime dependencies of ramp_optimizer.py.
 # Tkinter is not listed because it ships with Python.
 numpy>=1.20
-scipy>=1.7
+
+# scipy is pinned to a known-good range.  Newer scipy releases changed
+# the differential_evolution implementation enough that ``search_smooth``
+# with our default budget converges to a noticeably worse local optimum
+# (~-0.7 cm worst-case scrape vs ~-0.14 cm on scipy 1.10/1.11) for the
+# Seat Leon FR 2025 default geometry.  See the smoke-test discussion in
+# the v0.7.x development thread for measurements.  Bump the upper bound
+# only after re-running ``tests/test_search_determinism.py`` and a manual
+# comparison against the v0.4.1 baseline result.
+scipy>=1.10,<1.12
+
 matplotlib>=3.5
 
 # Build-time dependency — only needed to compile the .exe with build_exe.py.
