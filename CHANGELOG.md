@@ -6,6 +6,15 @@ The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this
 project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0](https://github.com/EfrenPy/garage-ramp-optimizer/compare/v0.5.0...v0.6.0) (2026-05-09)
+
+
+### Features
+
+* **cost:** concrete-volume estimator for each profile ([15522e9](https://github.com/EfrenPy/garage-ramp-optimizer/commit/15522e909891db6ac6a228315d2686aaca96618b))
+* **gui:** live preview of the linear ramp profile ([ffdf68c](https://github.com/EfrenPy/garage-ramp-optimizer/commit/ffdf68c1107a60a2853ff3414456624ce97587f7))
+* let the user pick which profile searches to run ([13165b9](https://github.com/EfrenPy/garage-ramp-optimizer/commit/13165b9a4b8a439e807d405a2d203ccff5da3d58))
+
 ## [0.5.0](https://github.com/EfrenPy/garage-ramp-optimizer/compare/v0.4.2...v0.5.0) (2026-05-09)
 
 
