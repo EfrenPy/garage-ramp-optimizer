@@ -62,23 +62,27 @@ def launch_gui() -> None:
     root = tk.Tk()
     root.title(t("Garage Ramp Optimizer"))
 
-    # Responsive window: target a comfortable size, but never larger than
-    # ~92 % of the available screen so the window always fits.  A minsize
-    # keeps the controls usable when the user shrinks the window.
+    # Responsive window: target a comfortable size, but never larger
+    # than ~85 % of the available screen so the Windows taskbar /
+    # macOS menu bar never hide the Calculate button.  We also keep
+    # ``minsize`` small enough that a 720p (1280x720) laptop fits.
     sw = root.winfo_screenwidth()
     sh = root.winfo_screenheight()
-    target_w = min(960, max(720, int(sw * 0.92)))
-    target_h = min(960, max(620, int(sh * 0.90)))
+    target_w = min(960, max(680, int(sw * 0.85)))
+    target_h = min(820, max(540, int(sh * 0.80)))
     pos_x = max(0, (sw - target_w) // 2)
     pos_y = max(0, (sh - target_h) // 2 - 24)
     root.geometry(f"{target_w}x{target_h}+{pos_x}+{pos_y}")
-    root.minsize(640, 560)
+    root.minsize(560, 480)
 
-    # Slightly larger Tk scaling so every widget (including dialogs and
-    # menus that ttk does not theme) renders at a comfortable size on
-    # both standard- and high-DPI screens.
+    # Tk scaling.  At 1.30 the GUI is comfortable on regular and
+    # HiDPI displays but stretches off small laptop screens; we
+    # therefore back off to 1.10 when the available height is below
+    # ~820 px (typical 1366x768 laptop) so the inputs fit without the
+    # Calculate button being pushed below the screen.
+    tk_scale = 1.30 if sh >= 900 else 1.10
     try:
-        root.tk.call("tk", "scaling", 1.30)
+        root.tk.call("tk", "scaling", tk_scale)
     except tk.TclError:
         pass
 
@@ -120,9 +124,21 @@ def launch_gui() -> None:
 
     ttk.Separator(root).pack(fill="x", padx=10)
 
-    # ---- Ramp data ------------------------------------------------------ #
-    ramp_frame = ttk.LabelFrame(root, text=t("Ramp data"), padding=10)
-    ramp_frame.pack(fill="x", padx=14, pady=(8, 4))
+    # ---- 2-column inputs container ------------------------------------- #
+    # All four input frames (ramp, car, cost, methods) live in a single
+    # 2-column grid so they take roughly half the vertical space they
+    # would in a stacked layout.  This keeps the Calculate button on
+    # screen even on 720p / 800p laptop displays.
+    inputs_frame = ttk.Frame(root, padding=(14, 6, 14, 0))
+    inputs_frame.pack(fill="x")
+    inputs_frame.columnconfigure(0, weight=1, uniform="cols")
+    inputs_frame.columnconfigure(1, weight=1, uniform="cols")
+
+    # ---- Ramp data (top-left) ------------------------------------------ #
+    ramp_frame = ttk.LabelFrame(inputs_frame, text=t("Ramp data"),
+                                  padding=10)
+    ramp_frame.grid(row=0, column=0, sticky="nsew",
+                     padx=(0, 4), pady=(0, 4))
 
     def _entry(parent, row, label, default):
         ttk.Label(parent, text=label).grid(
@@ -140,7 +156,7 @@ def launch_gui() -> None:
     longitud_var = _entry(ramp_frame, 1,
                            t("Horizontal length of the ramp:"), 540)
 
-    # ---- Live linear-ramp preview -------------------------------------- #
+    # ---- Live linear-ramp preview (full-width strip below the grid) ---- #
     # A small embedded matplotlib canvas that re-renders the linear
     # baseline ramp every time the user edits rise or run (debounced by
     # 200 ms).  This gives instant visual feedback that the geometry the
@@ -157,16 +173,6 @@ def launch_gui() -> None:
             from matplotlib.figure import Figure
         except ImportError:
             preview_ok = False
-
-    if preview_ok:
-        preview_frame = ttk.LabelFrame(
-            root, text=t("Live preview (linear ramp)"), padding=4,
-        )
-        preview_frame.pack(fill="x", padx=14, pady=(2, 4))
-        preview_fig = Figure(figsize=(8, 1.9), dpi=100)
-        preview_ax = preview_fig.add_subplot(111)
-        preview_canvas = FigureCanvasTkAgg(preview_fig, master=preview_frame)
-        preview_canvas.get_tk_widget().pack(fill="x", expand=False)
 
     _preview_after_id = [None]
 
@@ -227,13 +233,14 @@ def launch_gui() -> None:
         # main window so the canvas picks up the correct width.
         root.after(50, _redraw_preview)
 
-    # ---- Car data ------------------------------------------------------- #
+    # ---- Car data (left column, below ramp data) ---------------------- #
     car_frame = ttk.LabelFrame(
-        root,
+        inputs_frame,
         text=t("Car data  (defaults: Seat Leon FR 2025)"),
         padding=10,
     )
-    car_frame.pack(fill="x", padx=14, pady=4)
+    car_frame.grid(row=1, column=0, sticky="nsew",
+                    padx=(0, 4), pady=(4, 0))
 
     altura_var = _entry(car_frame, 0,
                           t("Ground clearance (on flat):"), 14)
@@ -244,45 +251,15 @@ def launch_gui() -> None:
     voladizo_t_var = _entry(car_frame, 3,
                               t("Rear overhang (0 if it does not scrape):"), 0)
 
-    # ---- Methods to optimize ------------------------------------------- #
-    # The user can pick which profile searches to run.  3-slope is OFF
-    # by default because its result is almost always worse than the
-    # 4-slope / smooth profile on realistic ramp dimensions.
-    methods_frame = ttk.LabelFrame(
-        root, text=t("Profiles to optimize"), padding=10,
-    )
-    methods_frame.pack(fill="x", padx=14, pady=4)
-
-    enable_2arc_var = tk.BooleanVar(value=True)
-    enable_3slope_var = tk.BooleanVar(value=False)
-    enable_4slope_var = tk.BooleanVar(value=True)
-    enable_smooth_var = tk.BooleanVar(value=True)
-
-    ttk.Checkbutton(
-        methods_frame, variable=enable_2arc_var,
-        text=t("Two arcs + straight"),
-    ).grid(row=0, column=0, sticky="w", padx=6, pady=2)
-    ttk.Checkbutton(
-        methods_frame, variable=enable_4slope_var,
-        text=t("Four slopes"),
-    ).grid(row=0, column=1, sticky="w", padx=12, pady=2)
-    ttk.Checkbutton(
-        methods_frame, variable=enable_smooth_var,
-        text=t("Free-form smooth curve (PCHIP)"),
-    ).grid(row=1, column=0, columnspan=2, sticky="w", padx=6, pady=2)
-    ttk.Checkbutton(
-        methods_frame, variable=enable_3slope_var,
-        text=t("Three slopes  (computationally harder, takes longer)"),
-    ).grid(row=2, column=0, columnspan=2, sticky="w", padx=6, pady=2)
-
-    # ---- Concrete cost estimator (optional) ---------------------------- #
+    # ---- Concrete cost estimator (top-right, optional) ----------------- #
     # Both fields are optional: leave them empty to skip the cost report.
     cost_frame = ttk.LabelFrame(
-        root,
+        inputs_frame,
         text=t("Concrete cost estimator (optional)"),
         padding=10,
     )
-    cost_frame.pack(fill="x", padx=14, pady=4)
+    cost_frame.grid(row=0, column=1, sticky="nsew",
+                     padx=(4, 0), pady=(0, 4))
 
     ttk.Label(cost_frame, text=t("Ramp width:")).grid(
         row=0, column=0, sticky="e", padx=6, pady=4)
@@ -309,6 +286,79 @@ def launch_gui() -> None:
         text=t("(leave width or cost empty to skip the cost report)"),
         font=SMALL_FONT, foreground="#666",
     ).grid(row=2, column=0, columnspan=3, sticky="w", padx=6, pady=(2, 0))
+
+    # ---- Methods + output formats (bottom-right) ----------------------- #
+    # The user can pick which profile searches to run AND which file
+    # formats to produce.  3-slope is OFF by default (its result is
+    # almost always worse than 4-slope / smooth on realistic ramps);
+    # only PDF is ON by default to keep the output folder uncluttered
+    # since the PDFs are the only things workers actually print.
+    methods_frame = ttk.LabelFrame(
+        inputs_frame, text=t("Profiles to optimize"), padding=10,
+    )
+    methods_frame.grid(row=1, column=1, sticky="nsew",
+                        padx=(4, 0), pady=(4, 0))
+
+    enable_2arc_var = tk.BooleanVar(value=True)
+    enable_3slope_var = tk.BooleanVar(value=False)
+    enable_4slope_var = tk.BooleanVar(value=True)
+    enable_smooth_var = tk.BooleanVar(value=True)
+
+    ttk.Checkbutton(
+        methods_frame, variable=enable_2arc_var,
+        text=t("Two arcs + straight"),
+    ).grid(row=0, column=0, sticky="w", padx=6, pady=2)
+    ttk.Checkbutton(
+        methods_frame, variable=enable_4slope_var,
+        text=t("Four slopes"),
+    ).grid(row=1, column=0, sticky="w", padx=6, pady=2)
+    ttk.Checkbutton(
+        methods_frame, variable=enable_smooth_var,
+        text=t("Free-form smooth (PCHIP)"),
+    ).grid(row=2, column=0, sticky="w", padx=6, pady=2)
+    ttk.Checkbutton(
+        methods_frame, variable=enable_3slope_var,
+        text=t("Three slopes  (slower, usually worse)"),
+    ).grid(row=3, column=0, sticky="w", padx=6, pady=2)
+
+    # Output-format toggles.  Only PDF is checked by default; PNGs and
+    # CSVs are extra clutter most users do not need.
+    ttk.Separator(methods_frame, orient="horizontal").grid(
+        row=4, column=0, sticky="ew", padx=2, pady=(6, 4))
+    ttk.Label(methods_frame, text=t("Output formats:"),
+              font=BASE_FONT_BOLD).grid(
+        row=5, column=0, sticky="w", padx=6, pady=(0, 2))
+
+    output_pdf_var = tk.BooleanVar(value=True)
+    output_png_var = tk.BooleanVar(value=False)
+    output_csv_var = tk.BooleanVar(value=False)
+
+    formats_inner = ttk.Frame(methods_frame)
+    formats_inner.grid(row=6, column=0, sticky="w", padx=6, pady=2)
+    ttk.Checkbutton(
+        formats_inner, variable=output_pdf_var,
+        text=t("PDF blueprints"),
+    ).pack(side="left", padx=(0, 12))
+    ttk.Checkbutton(
+        formats_inner, variable=output_png_var,
+        text=t("PNG images"),
+    ).pack(side="left", padx=(0, 12))
+    ttk.Checkbutton(
+        formats_inner, variable=output_csv_var,
+        text=t("CSV measurements"),
+    ).pack(side="left")
+
+    # Live preview canvas: full-width, just below the 2-column inputs.
+    # Keep it short (1.4 in) so the Calculate button stays on screen.
+    if preview_ok:
+        preview_frame = ttk.LabelFrame(
+            root, text=t("Live preview (linear ramp)"), padding=4,
+        )
+        preview_frame.pack(fill="x", padx=14, pady=(4, 4))
+        preview_fig = Figure(figsize=(8, 1.4), dpi=100)
+        preview_ax = preview_fig.add_subplot(111)
+        preview_canvas = FigureCanvasTkAgg(preview_fig, master=preview_frame)
+        preview_canvas.get_tk_widget().pack(fill="x", expand=False)
 
     # ---- Output folder -------------------------------------------------- #
     folder_frame = ttk.LabelFrame(
@@ -481,7 +531,8 @@ def launch_gui() -> None:
             return
 
     def _worker(ramp, car, out_dir, ramp_width, cost_per_m3, currency,
-                enable_2arc, enable_3slope, enable_4slope, enable_smooth):
+                enable_2arc, enable_3slope, enable_4slope, enable_smooth,
+                output_pdf, output_png, output_csv):
         try:
             cwd = os.getcwd()
             os.chdir(out_dir)
@@ -498,6 +549,9 @@ def launch_gui() -> None:
                         enable_3slope=enable_3slope,
                         enable_4slope=enable_4slope,
                         enable_smooth=enable_smooth,
+                        output_pdf=output_pdf,
+                        output_png=output_png,
+                        output_csv=output_csv,
                     )
             finally:
                 os.chdir(cwd)
@@ -675,12 +729,21 @@ def launch_gui() -> None:
                 t("Pick at least one profile to optimise."),
             )
             return
+        if not (output_pdf_var.get() or output_png_var.get()
+                or output_csv_var.get()):
+            messagebox.showerror(
+                t("Invalid data"),
+                t("Pick at least one output format (PDF / PNG / CSV)."),
+            )
+            return
 
         thread = threading.Thread(
             target=_worker,
             args=(ramp, car, out_dir, ramp_width_v, cost_v, currency_v,
                   enable_2arc_var.get(), enable_3slope_var.get(),
-                  enable_4slope_var.get(), enable_smooth_var.get()),
+                  enable_4slope_var.get(), enable_smooth_var.get(),
+                  output_pdf_var.get(), output_png_var.get(),
+                  output_csv_var.get()),
             daemon=True,
         )
         thread.start()

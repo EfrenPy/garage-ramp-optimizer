@@ -233,24 +233,38 @@ except ImportError:
     HAS_PLT = False
 
 
+# --------------------------------------------------------------------------- #
+#  Output-format toggles
+# --------------------------------------------------------------------------- #
+# These flags are flipped at the start of ``compute_and_save`` based on the
+# caller's ``output_pdf`` / ``output_png`` / ``output_csv`` arguments and
+# read by every helper that touches disk (``_save_fig``, ``write_offsets``
+# and the inline CSV-writing blocks inside ``compute_and_save``).  They
+# default to True so existing callers and tests keep their full output.
+_OUTPUT_PDF = True
+_OUTPUT_PNG = True
+_OUTPUT_CSV = True
+
+
 def _save_fig(fig, png_path: str, dpi: int = 130) -> str:
-    """Save the figure as PNG and (best-effort) a vector PDF next to it.
+    """Save the figure in whichever formats are currently enabled.
 
-    The PDF is a vector copy of the same drawing, intended for zooming
-    in without pixelation when the worker prints or projects it.
-
-    If the PDF backend is not available (e.g. a stripped-down PyInstaller
-    bundle that does not include ``matplotlib.backends.backend_pdf``),
-    we skip the PDF silently so the PNG output still goes through.
-    Returns the PDF path that was written, or an empty string if PDF
-    output was skipped.
+    Honors the module-level ``_OUTPUT_PNG`` / ``_OUTPUT_PDF`` toggles
+    so a user who only wants the PDF blueprints does not also get
+    every PNG sitting next to them.  Returns the PDF path that was
+    written, or an empty string if PDF output was skipped (either
+    because the user opted out or because the PDF backend is not
+    available in a stripped-down PyInstaller bundle).
     """
-    fig.savefig(png_path, dpi=dpi)
+    if _OUTPUT_PNG:
+        fig.savefig(png_path, dpi=dpi)
     pdf_path = png_path
     if pdf_path.lower().endswith(".png"):
         pdf_path = pdf_path[:-4] + ".pdf"
     else:
         pdf_path = pdf_path + ".pdf"
+    if not _OUTPUT_PDF:
+        return ""
     try:
         fig.savefig(pdf_path)
     except (ImportError, ModuleNotFoundError, ValueError) as exc:
@@ -2723,15 +2737,16 @@ def draw_three_slope_blueprint(ramp: Ramp, best3: dict, path: str = "ramp_bluepr
 def write_offsets(path, x, y, n=28):
     xs = np.linspace(0.0, x[-1], n)
     ys = np.interp(xs, x, y)
-    with open(path, "w", newline="") as f:
-        w = csv.writer(f)
-        w.writerow(["x_cm", "y_cm"])
-        for xi, yi in zip(xs, ys):
-            w.writerow([f"{xi:.2f}", f"{yi:.2f}"])
-    print(t("Construction offsets saved to {path}").format(path=path))
-    print(t("  x = horizontal distance from the start of the ramp"))
-    print(t("  y = height above the garage floor"))
-    print()
+    if _OUTPUT_CSV:
+        with open(path, "w", newline="") as f:
+            w = csv.writer(f)
+            w.writerow(["x_cm", "y_cm"])
+            for xi, yi in zip(xs, ys):
+                w.writerow([f"{xi:.2f}", f"{yi:.2f}"])
+        print(t("Construction offsets saved to {path}").format(path=path))
+        print(t("  x = horizontal distance from the start of the ramp"))
+        print(t("  y = height above the garage floor"))
+        print()
     print("  x (cm)   y (cm)")
     for xi, yi in zip(xs, ys):
         print(f"  {xi:6.1f}   {yi:6.2f}")
@@ -2816,7 +2831,8 @@ def _ask_float(prompt: str, default: float | None = None,
 
 
 def parse_inputs() -> tuple["Ramp", "Car", float, float, str,
-                              bool, bool, bool, bool]:
+                              bool, bool, bool, bool,
+                              bool, bool, bool]:
     """
     Reads the ramp and car parameters from the command line, or asks for
     them on the console if missing.
@@ -2911,6 +2927,24 @@ def parse_inputs() -> tuple["Ramp", "Car", float, float, str,
         action="store_false", default=True,
         help=t("Skip the free-form smooth (PCHIP) optimisation."),
     )
+    # Output-format toggles.  Default: PDFs are written, PNGs and CSVs
+    # are skipped (the GUI default).  Pass --png and / or --csv on the
+    # CLI to write them too, or --no-pdf to skip the PDFs.
+    parser.add_argument(
+        "--no-pdf", dest="output_pdf",
+        action="store_false", default=True,
+        help=t("Skip the PDF blueprints (only PNGs / CSVs are written)."),
+    )
+    parser.add_argument(
+        "--png", dest="output_png",
+        action="store_true", default=False,
+        help=t("Also write the raster PNG copies of every blueprint."),
+    )
+    parser.add_argument(
+        "--csv", dest="output_csv",
+        action="store_true", default=False,
+        help=t("Also write the CSV measurement tables."),
+    )
     parser.add_argument(
         "--lang", choices=["en", "es"], default=None,
         help=t("Output language for the GUI, the console messages and "
@@ -2992,14 +3026,16 @@ def parse_inputs() -> tuple["Ramp", "Car", float, float, str,
     ramp = Ramp(rise=args.desnivel, run=args.longitud)
     return (ramp, car, args.ramp_width, args.cost_per_m3, args.currency,
             args.enable_2arc, args.enable_3slope,
-            args.enable_4slope, args.enable_smooth)
+            args.enable_4slope, args.enable_smooth,
+            args.output_pdf, args.output_png, args.output_csv)
 
 
 def main() -> None:
     """Punto de entrada CLI: lee parametros y llama a compute_and_save."""
     (ramp, car, ramp_width, cost_per_m3, currency,
      enable_2arc, enable_3slope,
-     enable_4slope, enable_smooth) = parse_inputs()
+     enable_4slope, enable_smooth,
+     output_pdf, output_png, output_csv) = parse_inputs()
     compute_and_save(
         ramp, car,
         ramp_width_cm=ramp_width,
@@ -3009,6 +3045,9 @@ def main() -> None:
         enable_3slope=enable_3slope,
         enable_4slope=enable_4slope,
         enable_smooth=enable_smooth,
+        output_pdf=output_pdf,
+        output_png=output_png,
+        output_csv=output_csv,
     )
 
 
@@ -3021,9 +3060,32 @@ def compute_and_save(
     enable_3slope: bool = False,
     enable_4slope: bool = True,
     enable_smooth: bool = True,
+    output_pdf: bool = True,
+    output_png: bool = True,
+    output_csv: bool = True,
 ) -> None:
     """Run every search, generate every file (PNG, PDF, CSV) in the
-    current working directory.  Called from both the CLI and the GUI."""
+    current working directory.  Called from both the CLI and the GUI.
+
+    The ``output_pdf`` / ``output_png`` / ``output_csv`` flags decide
+    which file formats actually land on disk; the optimisation results
+    themselves are computed regardless.
+    """
+    global _OUTPUT_PDF, _OUTPUT_PNG, _OUTPUT_CSV
+    _OUTPUT_PDF = bool(output_pdf)
+    _OUTPUT_PNG = bool(output_png)
+    _OUTPUT_CSV = bool(output_csv)
+    skipped_fmts = []
+    if not _OUTPUT_PDF: skipped_fmts.append("PDF")
+    if not _OUTPUT_PNG: skipped_fmts.append("PNG")
+    if not _OUTPUT_CSV: skipped_fmts.append("CSV")
+    if skipped_fmts:
+        print(t(
+            "NOTE: skipping {fmts} output (disabled by the user); the "
+            "'saved to ...' lines below name the canonical filename "
+            "even when the file is not actually written."
+        ).format(fmts=" / ".join(skipped_fmts)))
+        print()
     grade_pct = 100.0 * ramp.rise / ramp.run
     grade_deg = math.degrees(math.atan(ramp.rise / ramp.run))
     print(t("Ramp:  rise = {rise} cm,  run = {run} cm,  mean grade = "
@@ -3248,16 +3310,18 @@ def compute_and_save(
             n_rows = 28 if profile_name == "4 tramos" else 40
             ss_out = np.linspace(0.0, s_arr[-1], n_rows)
             ps_out = np.interp(ss_out, s_arr, p_arr)
-            with open(fname, "w", newline="") as f:
-                w = csv.writer(f)
-                w.writerow([
-                    "s_cm_along_cuerda_desde_T",
-                    "p_cm_perpendicular_a_cuerda",
-                ])
-                for si, pi in zip(ss_out, ps_out):
-                    w.writerow([f"{si:.2f}", f"{pi:.2f}"])
-            print(t("Top-reference cord offsets ({label}) saved to {path}"
-                    ).format(label=t(profile_name), path=fname))
+            if _OUTPUT_CSV:
+                with open(fname, "w", newline="") as f:
+                    w = csv.writer(f)
+                    w.writerow([
+                        "s_cm_along_cuerda_desde_T",
+                        "p_cm_perpendicular_a_cuerda",
+                    ])
+                    for si, pi in zip(ss_out, ps_out):
+                        w.writerow([f"{si:.2f}", f"{pi:.2f}"])
+                print(t("Top-reference cord offsets ({label}) saved to "
+                        "{path}").format(label=t(profile_name),
+                                          path=fname))
 
         # Top-reference (u, d) CSVs for both profiles.
         for name, xc, yc, fname in [
@@ -3274,18 +3338,19 @@ def compute_and_save(
             n_rows = 28 if name == "4 slopes" else 40
             us = np.linspace(0.0, u_arr[-1], n_rows)
             ds = np.interp(us, u_arr, d_arr)
-            with open(fname, "w", newline="") as f:
-                w = csv.writer(f)
-                w.writerow([
-                    "u_cm_from_top_edge",
-                    "d_cm_below_top_plane",
-                    "drop_cm_from_wall",
-                ])
-                for ui, di in zip(us, ds):
-                    w.writerow([f"{ui:.2f}", f"{di:.2f}",
-                                f"{WALL_OFFSET + di:.2f}"])
-            print(t("Top-reference offsets ({label}) saved to {path}"
-                    ).format(label=t(name), path=fname))
+            if _OUTPUT_CSV:
+                with open(fname, "w", newline="") as f:
+                    w = csv.writer(f)
+                    w.writerow([
+                        "u_cm_from_top_edge",
+                        "d_cm_below_top_plane",
+                        "drop_cm_from_wall",
+                    ])
+                    for ui, di in zip(us, ds):
+                        w.writerow([f"{ui:.2f}", f"{di:.2f}",
+                                    f"{WALL_OFFSET + di:.2f}"])
+                print(t("Top-reference offsets ({label}) saved to "
+                        "{path}").format(label=t(name), path=fname))
 
     # ---- Comparison summary --------------------------------------------- #
     print("\n" + t("Comparison summary (worst scrape, in cm; positive = "
@@ -3371,19 +3436,20 @@ def compute_and_save(
         us_top = np.linspace(0.0, u_arr[-1], 28)
         ds_top = np.interp(us_top, u_arr, d_arr)
         csv_3slope_top = _output_name("csv_3slope_top", ".csv")
-        with open(csv_3slope_top, "w", newline="") as f:
-            w = csv.writer(f)
-            w.writerow([
-                "u_cm_from_top_edge",
-                "d_cm_below_top_plane",
-                "drop_cm_from_wall",
-            ])
-            for ui, di in zip(us_top, ds_top):
-                w.writerow([f"{ui:.2f}", f"{di:.2f}",
-                            f"{WALL_OFFSET_OVER_TOP + di:.2f}"])
-        print(t("Top-reference offsets saved to {path}").format(
-            path=csv_3slope_top,
-        ))
+        if _OUTPUT_CSV:
+            with open(csv_3slope_top, "w", newline="") as f:
+                w = csv.writer(f)
+                w.writerow([
+                    "u_cm_from_top_edge",
+                    "d_cm_below_top_plane",
+                    "drop_cm_from_wall",
+                ])
+                for ui, di in zip(us_top, ds_top):
+                    w.writerow([f"{ui:.2f}", f"{di:.2f}",
+                                f"{WALL_OFFSET_OVER_TOP + di:.2f}"])
+            print(t("Top-reference offsets saved to {path}").format(
+                path=csv_3slope_top,
+            ))
 
         # Print key points of the 3-slope ramp to the terminal.
         print()

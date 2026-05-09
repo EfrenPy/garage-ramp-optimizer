@@ -680,6 +680,34 @@ _TRANSLATIONS_ES: "dict[str, str]" = {
         "Omitir la optimizacion de cuatro tramos rectos.",
     "Skip the free-form smooth (PCHIP) optimisation.":
         "Omitir la optimizacion de la curva suave libre (PCHIP).",
+
+    # ---- Output-format toggles + tighter labels (added in v0.7) ---- #
+    "Free-form smooth (PCHIP)":
+        "Curva suave libre (PCHIP)",
+    "Three slopes  (slower, usually worse)":
+        "Tres tramos rectos  (mas lento, suele dar peor resultado)",
+    "Output formats:":
+        "Formatos de salida:",
+    "PDF blueprints":
+        "Planos en PDF",
+    "PNG images":
+        "Imagenes PNG",
+    "CSV measurements":
+        "Medidas en CSV",
+    "Pick at least one output format (PDF / PNG / CSV).":
+        "Selecciona al menos un formato de salida (PDF / PNG / CSV).",
+    "NOTE: skipping {fmts} output (disabled by the user); the "
+    "'saved to ...' lines below name the canonical filename "
+    "even when the file is not actually written.":
+        "NOTA: omitiendo la salida {fmts} (desactivada por el usuario); "
+        "las lineas 'saved to ...' siguientes nombran el fichero "
+        "canonico aunque no se escriba realmente en disco.",
+    "Skip the PDF blueprints (only PNGs / CSVs are written).":
+        "Omitir los planos en PDF (solo se escriben los PNG / CSV).",
+    "Also write the raster PNG copies of every blueprint.":
+        "Escribir tambien las copias en PNG (raster) de cada plano.",
+    "Also write the CSV measurement tables.":
+        "Escribir tambien las tablas de medidas en CSV.",
 }
 
 

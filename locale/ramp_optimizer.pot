@@ -5,7 +5,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: garage-ramp-optimizer 0.1.0\n"
-"POT-Creation-Date: 2026-05-09 15:25+0000\n"
+"POT-Creation-Date: 2026-05-09 15:47+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -912,4 +912,37 @@ msgid "Skip the four-slope optimisation."
 msgstr ""
 
 msgid "Skip the free-form smooth (PCHIP) optimisation."
+msgstr ""
+
+msgid "Free-form smooth (PCHIP)"
+msgstr ""
+
+msgid "Three slopes  (slower, usually worse)"
+msgstr ""
+
+msgid "Output formats:"
+msgstr ""
+
+msgid "PDF blueprints"
+msgstr ""
+
+msgid "PNG images"
+msgstr ""
+
+msgid "CSV measurements"
+msgstr ""
+
+msgid "Pick at least one output format (PDF / PNG / CSV)."
+msgstr ""
+
+msgid "NOTE: skipping {fmts} output (disabled by the user); the 'saved to ...' lines below name the canonical filename even when the file is not actually written."
+msgstr ""
+
+msgid "Skip the PDF blueprints (only PNGs / CSVs are written)."
+msgstr ""
+
+msgid "Also write the raster PNG copies of every blueprint."
+msgstr ""
+
+msgid "Also write the CSV measurement tables."
 msgstr ""

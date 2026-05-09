@@ -5,8 +5,8 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: garage-ramp-optimizer 0.1.0\n"
-"POT-Creation-Date: 2026-05-09 15:25+0000\n"
-"PO-Revision-Date: 2026-05-09 15:25+0000\n"
+"POT-Creation-Date: 2026-05-09 15:47+0000\n"
+"PO-Revision-Date: 2026-05-09 15:47+0000\n"
 "Last-Translator: Efren Rodriguez Rodriguez\n"
 "Language-Team: Spanish\n"
 "Language: es\n"
@@ -913,3 +913,36 @@ msgstr "Omitir la optimizacion de cuatro tramos rectos."
 
 msgid "Skip the free-form smooth (PCHIP) optimisation."
 msgstr "Omitir la optimizacion de la curva suave libre (PCHIP)."
+
+msgid "Free-form smooth (PCHIP)"
+msgstr "Curva suave libre (PCHIP)"
+
+msgid "Three slopes  (slower, usually worse)"
+msgstr "Tres tramos rectos  (mas lento, suele dar peor resultado)"
+
+msgid "Output formats:"
+msgstr "Formatos de salida:"
+
+msgid "PDF blueprints"
+msgstr "Planos en PDF"
+
+msgid "PNG images"
+msgstr "Imagenes PNG"
+
+msgid "CSV measurements"
+msgstr "Medidas en CSV"
+
+msgid "Pick at least one output format (PDF / PNG / CSV)."
+msgstr "Selecciona al menos un formato de salida (PDF / PNG / CSV)."
+
+msgid "NOTE: skipping {fmts} output (disabled by the user); the 'saved to ...' lines below name the canonical filename even when the file is not actually written."
+msgstr "NOTA: omitiendo la salida {fmts} (desactivada por el usuario); las lineas 'saved to ...' siguientes nombran el fichero canonico aunque no se escriba realmente en disco."
+
+msgid "Skip the PDF blueprints (only PNGs / CSVs are written)."
+msgstr "Omitir los planos en PDF (solo se escriben los PNG / CSV)."
+
+msgid "Also write the raster PNG copies of every blueprint."
+msgstr "Escribir tambien las copias en PNG (raster) de cada plano."
+
+msgid "Also write the CSV measurement tables."
+msgstr "Escribir tambien las tablas de medidas en CSV."
