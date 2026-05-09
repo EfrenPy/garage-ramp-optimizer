@@ -6,6 +6,13 @@ The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this
 project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1](https://github.com/EfrenPy/garage-ramp-optimizer/compare/v0.4.0...v0.4.1) (2026-05-09)
+
+
+### Bug Fixes
+
+* **optimizer:** make smooth-curve search bit-for-bit reproducible ([f2ed23c](https://github.com/EfrenPy/garage-ramp-optimizer/commit/f2ed23c34875d9f4fc5de31741ce6f6bc6b3ae1a))
+
 ## [0.4.0](https://github.com/EfrenPy/garage-ramp-optimizer/compare/v0.3.0...v0.4.0) (2026-05-08)
 
 
