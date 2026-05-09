@@ -6,6 +6,18 @@ The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this
 project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0](https://github.com/EfrenPy/garage-ramp-optimizer/compare/v0.6.0...v0.7.0) (2026-05-09)
+
+
+### Features
+
+* **gui:** 2-column inputs, smaller-screen sizing, output-format toggles ([849ad15](https://github.com/EfrenPy/garage-ramp-optimizer/commit/849ad15ba0b939a9dcd8961f8e966ec629c41e56))
+
+
+### Bug Fixes
+
+* **blueprints:** give the wall-reference smooth blueprint room below the plot ([80b8c8e](https://github.com/EfrenPy/garage-ramp-optimizer/commit/80b8c8e030338ef4b5efeb3df77320c486d1b5be))
+
 ## [0.6.0](https://github.com/EfrenPy/garage-ramp-optimizer/compare/v0.5.0...v0.6.0) (2026-05-09)
 
 
