@@ -1999,9 +1999,13 @@ def draw_smooth_blueprint_groundref(
     xs = np.unique(np.concatenate([[0.0], xs, [ramp.run]]))
     ys = np.interp(xs, x_curve, y_curve)
 
-    fig = plt.figure(figsize=(22, 17))
+    fig = plt.figure(figsize=(22, 19))
+    # Match the chord-blueprint layout: leave the lower 38 % of the figure
+    # for the measurements table with a clean gap between the plot and the
+    # table, instead of letting the table sit flush against the working
+    # drawing.
     gs = fig.add_gridspec(
-        2, 1, left=0.06, right=0.98, top=0.95, bottom=0.30,
+        2, 1, left=0.06, right=0.98, top=0.94, bottom=0.42,
         hspace=0.30, height_ratios=[1.0, 4.4],
     )
     ax_true = fig.add_subplot(gs[0, 0])
@@ -2128,9 +2132,11 @@ def draw_smooth_blueprint_groundref(
     )
 
     # ---- Table ---------------------------------------------------------- #
-    table_rows = [(
-        "n", "x (cm)", "y (cm)", t("type"),
-    )]
+    # Inline table at the chord-blueprint position (the gridspec ends at
+    # y=0.42, so the table fills the lower 36 % of the figure with a
+    # comfortable gap above it).
+    col_labels = ["n", "x (cm)", "y (cm)", t("type")]
+    rows = []
     n_total = len(xs)
     for n, (xi, yi) in enumerate(zip(xs, ys), start=1):
         if n == 1:
@@ -2139,8 +2145,27 @@ def draw_smooth_blueprint_groundref(
             kind = t("end station (at the street)")
         else:
             kind = t("intermediate station")
-        table_rows.append((str(n), f"{xi:7.1f}", f"{yi:7.1f}", kind))
-    _topref_table(fig, table_rows, n_cols=4)
+        rows.append((str(n), f"{xi:7.1f}", f"{yi:7.1f}", kind))
+
+    ax_table = fig.add_axes([0.05, 0.02, 0.92, 0.36])
+    ax_table.set_axis_off()
+    table = ax_table.table(
+        cellText=rows, colLabels=col_labels,
+        loc="center", cellLoc="left", colLoc="left",
+    )
+    table.auto_set_font_size(False)
+    table.set_fontsize(10)
+    table.scale(1.0, 1.5)
+    n_cols = len(col_labels)
+    for c in range(n_cols):
+        cell = table[(0, c)]
+        cell.set_text_props(fontweight="bold")
+        cell.set_facecolor("#e6e6e6")
+    for r_idx in range(1, len(rows) + 1):
+        for c in range(n_cols):
+            table[(r_idx, c)].set_facecolor(
+                "#fff8e0" if r_idx % 2 else "#fffefa"
+            )
 
     pdf_path = _save_fig(fig, path)
     print(t("Construction blueprint saved to {path} (+ PDF: {pdf})"
