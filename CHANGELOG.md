@@ -6,6 +6,13 @@ The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this
 project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0](https://github.com/EfrenPy/garage-ramp-optimizer/compare/v0.4.2...v0.5.0) (2026-05-09)
+
+
+### Features
+
+* parallelize every profile search and bump GUI legibility ([bf2d5af](https://github.com/EfrenPy/garage-ramp-optimizer/commit/bf2d5afcb3b33734979d75197dea432f4bba56d1))
+
 ## [0.4.2](https://github.com/EfrenPy/garage-ramp-optimizer/compare/v0.4.1...v0.4.2) (2026-05-09)
 
 
