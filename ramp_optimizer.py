@@ -3523,6 +3523,93 @@ def launch_gui() -> None:
     longitud_var = _entry(ramp_frame, 1,
                            t("Horizontal length of the ramp:"), 540)
 
+    # ---- Live linear-ramp preview -------------------------------------- #
+    # A small embedded matplotlib canvas that re-renders the linear
+    # baseline ramp every time the user edits rise or run (debounced by
+    # 200 ms).  This gives instant visual feedback that the geometry the
+    # user typed in is sane, without having to wait for a full
+    # optimisation pass.  It is purely a sanity-check view: the curved
+    # / piecewise profiles are only computed when the user clicks
+    # "Calculate".
+    preview_ok = HAS_PLT
+    preview_canvas = None
+    preview_ax = None
+    if preview_ok:
+        try:
+            from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+            from matplotlib.figure import Figure
+        except ImportError:
+            preview_ok = False
+
+    if preview_ok:
+        preview_frame = ttk.LabelFrame(
+            root, text=t("Live preview (linear ramp)"), padding=4,
+        )
+        preview_frame.pack(fill="x", padx=14, pady=(2, 4))
+        preview_fig = Figure(figsize=(8, 1.9), dpi=100)
+        preview_ax = preview_fig.add_subplot(111)
+        preview_canvas = FigureCanvasTkAgg(preview_fig, master=preview_frame)
+        preview_canvas.get_tk_widget().pack(fill="x", expand=False)
+
+    _preview_after_id = [None]
+
+    def _redraw_preview() -> None:
+        if not preview_ok:
+            return
+        try:
+            rise_v = float(desnivel_var.get().strip().replace(",", "."))
+            run_v = float(longitud_var.get().strip().replace(",", "."))
+        except ValueError:
+            return
+        if rise_v <= 0 or run_v <= 0:
+            return
+        ax = preview_ax
+        ax.clear()
+        # Garage floor + street stubs.
+        ax.plot([-100, 0], [0, 0], "k-", linewidth=1.6)
+        ax.plot([run_v, run_v + 100], [rise_v, rise_v], "k-",
+                linewidth=1.6)
+        # The linear ramp itself.
+        ax.plot([0, run_v], [0, rise_v], color="tab:red",
+                linewidth=2.6, label=t("Linear ramp"))
+        ax.scatter([0, run_v], [0, rise_v], color="tab:red", s=35,
+                   zorder=5)
+        ax.set_aspect("equal")
+        ax.set_xlim(-120, run_v + 120)
+        ax.set_ylim(-12, rise_v + 18)
+        ax.grid(True, alpha=0.3)
+        grade_pct = 100.0 * rise_v / run_v
+        grade_deg = math.degrees(math.atan2(rise_v, run_v))
+        ax.set_title(
+            t("rise {r:.0f} cm,  run {n:.0f} cm   "
+              "({pct:.1f} %,  {deg:.1f} degrees)").format(
+                r=rise_v, n=run_v, pct=grade_pct, deg=grade_deg,
+            ),
+            fontsize=10,
+        )
+        ax.set_xlabel(t("x (cm)"), fontsize=9)
+        ax.set_ylabel(t("y (cm)"), fontsize=9)
+        ax.tick_params(labelsize=8)
+        preview_fig.tight_layout()
+        preview_canvas.draw_idle()
+
+    def _schedule_preview(*_a) -> None:
+        if not preview_ok:
+            return
+        if _preview_after_id[0] is not None:
+            try:
+                root.after_cancel(_preview_after_id[0])
+            except tk.TclError:
+                pass
+        _preview_after_id[0] = root.after(200, _redraw_preview)
+
+    if preview_ok:
+        desnivel_var.trace_add("write", _schedule_preview)
+        longitud_var.trace_add("write", _schedule_preview)
+        # Render the initial preview right after Tk has measured the
+        # main window so the canvas picks up the correct width.
+        root.after(50, _redraw_preview)
+
     # ---- Car data ------------------------------------------------------- #
     car_frame = ttk.LabelFrame(
         root,

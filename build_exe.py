@@ -156,10 +156,12 @@ def main() -> None:
         "--collect-submodules", "matplotlib.backends",
         "--collect-data", "matplotlib",
         # Specific backends.  Without these matplotlib's lazy import of
-        # backend_pdf would fail at runtime.
+        # backend_pdf would fail at runtime.  backend_tkagg is needed by
+        # the GUI's live linear-ramp preview canvas.
         "--hidden-import", "matplotlib.backends.backend_pdf",
         "--hidden-import", "matplotlib.backends.backend_agg",
         "--hidden-import", "matplotlib.backends.backend_svg",
+        "--hidden-import", "matplotlib.backends.backend_tkagg",
         # Tkinter ships with Python but some PyInstaller versions still
         # need it spelled out.
         "--hidden-import", "tkinter",
