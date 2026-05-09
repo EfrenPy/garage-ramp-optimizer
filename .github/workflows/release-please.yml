@@ -48,5 +48,9 @@ jobs:
     uses: ./.github/workflows/release.yml
     permissions:
       contents: write
+      # Needed by release.yml's "Delete intermediate workflow artifacts"
+      # cleanup step.  Reusable workflows can never escalate beyond what
+      # the caller grants, so we have to opt-in here as well.
+      actions: write
     with:
       tag: ${{ needs.release-please.outputs.tag_name }}
