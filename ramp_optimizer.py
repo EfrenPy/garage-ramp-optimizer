@@ -636,22 +636,11 @@ def smooth_profile(
 def search_smooth(
     ramp: Ramp, car: Car,
     K: int = 5,                  # number of interior control points
-    de_maxiter: int = 50, de_popsize: int = 14,
-    seeds: tuple = (11, 23, 41),
+    de_maxiter: int = 50, de_popsize: int = 14, seed: int = 11,
 ):
     """
     Optimise the K interior control points of a monotone cubic-spline
     profile.  Each control point contributes (x_frac, y_frac) in (0, 1).
-
-    The search is run once per entry in ``seeds`` and the best result
-    (lowest worst-case scrape) is returned.  This makes the answer
-    robust against scipy's differential_evolution implementation
-    changing between versions: scipy 1.11 with seed=11 lands on the
-    -0.14 cm global optimum on the default ramp, but newer scipy
-    releases were observed to converge to a -0.76 cm local optimum
-    with the same seed.  Running three seeds and taking the best gives
-    the older quality without committing the project to a specific
-    scipy version.
     """
     if not HAS_SCIPY:
         raise RuntimeError("scipy is required for the smooth-profile search")
@@ -679,26 +668,22 @@ def search_smooth(
         score = min(m["chassis_min"], m["overhang_min"])
         return -score
 
-    # Run DE once per seed and keep the best.  Use modern PCG64 via
-    # ``default_rng`` for each seed -- it samples the design space
-    # differently from the legacy MT19937 and in our geometry
-    # consistently finds a better (less-scratching) PCHIP optimum.
-    best_result = None
-    best_obj = float("inf")
-    for s in seeds:
-        result = differential_evolution(
-            objective, bounds,
-            maxiter=de_maxiter, popsize=de_popsize,
-            seed=np.random.default_rng(s),
-            tol=1e-3, mutation=(0.4, 1.3), recombination=0.85,
-            polish=True, workers=1, updating="deferred",
-        )
-        if result.fun < best_obj:
-            best_obj = result.fun
-            best_result = result
+    # Use modern PCG64 via ``default_rng`` for the smooth search -- it
+    # samples the design space differently from the legacy MT19937 and
+    # in our geometry it consistently finds a better (less-scratching)
+    # PCHIP optimum.  Passing a Generator explicitly also pins the RNG
+    # stream, so consecutive runs of the same input cannot land on
+    # different control points.
+    result = differential_evolution(
+        objective, bounds,
+        maxiter=de_maxiter, popsize=de_popsize,
+        seed=np.random.default_rng(seed),
+        tol=1e-3, mutation=(0.4, 1.3), recombination=0.85,
+        polish=True, workers=1, updating="deferred",
+    )
 
-    xfs = np.asarray(best_result.x[:K])
-    yfs = np.asarray(best_result.x[K:])
+    xfs = np.asarray(result.x[:K])
+    yfs = np.asarray(result.x[K:])
     xp, yp, xs_ctrl, ys_ctrl = smooth_profile(ramp, xfs, yfs, n=2400)
     m = evaluate(xp, yp, car, ramp, n_positions=3000, n_chassis=400)
     out = dict(
