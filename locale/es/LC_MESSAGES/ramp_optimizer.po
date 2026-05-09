@@ -5,8 +5,8 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: garage-ramp-optimizer 0.1.0\n"
-"POT-Creation-Date: 2026-05-08 10:45+0000\n"
-"PO-Revision-Date: 2026-05-08 10:45+0000\n"
+"POT-Creation-Date: 2026-05-09 15:25+0000\n"
+"PO-Revision-Date: 2026-05-09 15:25+0000\n"
 "Last-Translator: Efren Rodriguez Rodriguez\n"
 "Language-Team: Spanish\n"
 "Language: es\n"
@@ -274,6 +274,9 @@ msgstr "Plano de construccion (cuerda) guardado en {path} (+ PDF: {pdf})"
 
 msgid "Profile comparison plot saved to ramp_profile.png (+ PDF: {pdf})"
 msgstr "Grafica de perfiles guardada en ramp_profile.png (+ PDF: {pdf})"
+
+msgid "(matplotlib is not installed; skipping comparison plot)"
+msgstr "(matplotlib no esta instalado; no se genera la grafica)"
 
 msgid "Top-reference cord offsets ({label}) saved to {path}"
 msgstr "Cotas con referencia a cuerda ({label}) guardadas en {path}"
@@ -710,6 +713,15 @@ msgstr "Plano de trabajo - {label} - garaje a la izquierda, calle a la derecha  
 msgid "Continuous curve: mark a station every {step:.0f} cm along the wall and measure the indicated drop."
 msgstr "Curva continua: marcar una estacion cada {step:.0f} cm a lo largo del muro y medir la bajada indicada."
 
+msgid "Continuous curve: mark a station every {step:.0f} cm along the garage floor from the start of the ramp; for each station measure y vertically."
+msgstr "Curva continua: marcar una estacion cada {step:.0f} cm a lo largo del suelo del garaje desde el inicio de la rampa; para cada estacion medir y en vertical."
+
+msgid "start station (at the garage)"
+msgstr "estacion inicial (en el garaje)"
+
+msgid "end station (at the street)"
+msgstr "estacion final (en la calle)"
+
 msgid "Curve control points (informative):"
 msgstr "Puntos de control de la curva (informativo):"
 
@@ -781,3 +793,123 @@ msgstr "Calculando sensibilidad a la longitud de la rampa..."
 
 msgid "Done. Blueprints and CSVs generated."
 msgstr "Listo. Planos y CSV generados."
+
+msgid "Searching all profiles in parallel ({names}) ..."
+msgstr "Buscando todos los perfiles en paralelo ({names}) ..."
+
+msgid "Searching all profiles in parallel "
+msgstr "Buscando todos los perfiles en paralelo "
+
+msgid "none -- only the linear baseline will be reported"
+msgstr "ninguno -- solo se mostrara la rampa lineal de referencia"
+
+msgid "  ... {name}: done."
+msgstr "  ... {name}: listo."
+
+msgid "two arcs + straight"
+msgstr "dos arcos + recta"
+
+msgid "three slopes"
+msgstr "tres tramos rectos"
+
+msgid "four slopes"
+msgstr "cuatro tramos rectos"
+
+msgid "free-form smooth (PCHIP)"
+msgstr "curva suave libre (PCHIP)"
+
+msgid "Optimizing all profiles in parallel (longest step)..."
+msgstr "Optimizando todos los perfiles en paralelo (paso mas largo)..."
+
+msgid "Generating top-reference blueprints..."
+msgstr "Generando planos en sistema muro..."
+
+msgid "two arcs + straight: done.  Waiting for the rest..."
+msgstr "dos arcos + recta: listo. Esperando al resto..."
+
+msgid "three slopes: done.  Waiting for the rest..."
+msgstr "tres tramos rectos: listo. Esperando al resto..."
+
+msgid "four slopes: done.  Waiting for the rest..."
+msgstr "cuatro tramos rectos: listo. Esperando al resto..."
+
+msgid "free-form smooth (PCHIP): done."
+msgstr "curva suave libre (PCHIP): listo."
+
+msgid "Best parameters (two arcs + straight):"
+msgstr "Mejores parametros (dos arcos + recta):"
+
+msgid "Live preview (linear ramp)"
+msgstr "Vista previa en directo (rampa lineal)"
+
+msgid "Linear ramp"
+msgstr "Rampa lineal"
+
+msgid "rise {r:.0f} cm,  run {n:.0f} cm   ({pct:.1f} %,  {deg:.1f} degrees)"
+msgstr "desnivel {r:.0f} cm,  longitud {n:.0f} cm   ({pct:.1f} %,  {deg:.1f} grados)"
+
+msgid "Concrete cost estimator (optional)"
+msgstr "Estimador de coste del hormigon (opcional)"
+
+msgid "Ramp width:"
+msgstr "Ancho de la rampa:"
+
+msgid "Concrete cost per m^3:"
+msgstr "Coste del hormigon por m^3:"
+
+msgid "(leave width or cost empty to skip the cost report)"
+msgstr "(deja el ancho o el coste vacios para omitir el informe de coste)"
+
+msgid "Ramp width"
+msgstr "Ancho de la rampa"
+
+msgid "Cost per m^3"
+msgstr "Coste por m^3"
+
+msgid "Concrete-volume estimate (ramp width: {w:.0f} cm; slab from the floor up to the surface):"
+msgstr "Estimacion de volumen de hormigon (ancho de rampa: {w:.0f} cm; losa desde el suelo hasta la superficie):"
+
+msgid "volume (m^3)"
+msgstr "volumen (m^3)"
+
+msgid "delta vs linear (m^3)"
+msgstr "delta vs lineal (m^3)"
+
+msgid "cost ({sym})"
+msgstr "coste ({sym})"
+
+msgid "  (positive 'delta' = more concrete than the linear baseline)"
+msgstr "  (delta positivo = mas hormigon que la rampa lineal de referencia)"
+
+msgid "  (rate used: {rate:.2f} {sym} per m^3)"
+msgstr "  (precio usado: {rate:.2f} {sym} por m^3)"
+
+msgid "Ramp width in cm (perpendicular to the slope direction). Used only by the optional concrete-volume cost estimator. Leave at 0 to skip the cost report."
+msgstr "Ancho de la rampa en cm (perpendicular a la direccion de la pendiente). Lo usa solo el estimador opcional de volumen de hormigon. Deja 0 para omitir el informe de coste."
+
+msgid "Cost per cubic metre of concrete in your currency, used by the optional cost estimator.  Leave at 0 to print only the volumes."
+msgstr "Coste por metro cubico de hormigon en tu moneda, usado por el estimador opcional de coste. Deja 0 para mostrar solo los volumenes."
+
+msgid "Currency symbol shown next to the estimated cost (e.g. EUR, USD, GBP)."
+msgstr "Simbolo de la moneda mostrado junto al coste estimado (p.ej. EUR, USD, GBP)."
+
+msgid "Profiles to optimize"
+msgstr "Perfiles a optimizar"
+
+msgid "Three slopes  (computationally harder, takes longer)"
+msgstr "Tres tramos rectos  (mas costoso de calcular, tarda mas)"
+
+msgid "Pick at least one profile to optimise."
+msgstr "Selecciona al menos un perfil para optimizar."
+
+msgid "Skip the two-arc + straight optimisation."
+msgstr "Omitir la optimizacion de dos arcos + recta."
+
+msgid "Run the three-slope grid search.  Off by default; the result rarely beats the 4-slope or smooth profile."
+msgstr "Ejecutar la busqueda en rejilla de tres tramos rectos. Desactivada por defecto; el resultado rara vez supera al perfil de 4 tramos o a la curva suave."
+
+msgid "Skip the four-slope optimisation."
+msgstr "Omitir la optimizacion de cuatro tramos rectos."
+
+msgid "Skip the free-form smooth (PCHIP) optimisation."
+msgstr "Omitir la optimizacion de la curva suave libre (PCHIP)."

@@ -5,7 +5,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: garage-ramp-optimizer 0.1.0\n"
-"POT-Creation-Date: 2026-05-08 10:45+0000\n"
+"POT-Creation-Date: 2026-05-09 15:25+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -273,6 +273,9 @@ msgid "Construction blueprint (cord reference) saved to {path} (+ PDF: {pdf})"
 msgstr ""
 
 msgid "Profile comparison plot saved to ramp_profile.png (+ PDF: {pdf})"
+msgstr ""
+
+msgid "(matplotlib is not installed; skipping comparison plot)"
 msgstr ""
 
 msgid "Top-reference cord offsets ({label}) saved to {path}"
@@ -710,6 +713,15 @@ msgstr ""
 msgid "Continuous curve: mark a station every {step:.0f} cm along the wall and measure the indicated drop."
 msgstr ""
 
+msgid "Continuous curve: mark a station every {step:.0f} cm along the garage floor from the start of the ramp; for each station measure y vertically."
+msgstr ""
+
+msgid "start station (at the garage)"
+msgstr ""
+
+msgid "end station (at the street)"
+msgstr ""
+
 msgid "Curve control points (informative):"
 msgstr ""
 
@@ -780,4 +792,124 @@ msgid "Computing sensitivity to ramp length..."
 msgstr ""
 
 msgid "Done. Blueprints and CSVs generated."
+msgstr ""
+
+msgid "Searching all profiles in parallel ({names}) ..."
+msgstr ""
+
+msgid "Searching all profiles in parallel "
+msgstr ""
+
+msgid "none -- only the linear baseline will be reported"
+msgstr ""
+
+msgid "  ... {name}: done."
+msgstr ""
+
+msgid "two arcs + straight"
+msgstr ""
+
+msgid "three slopes"
+msgstr ""
+
+msgid "four slopes"
+msgstr ""
+
+msgid "free-form smooth (PCHIP)"
+msgstr ""
+
+msgid "Optimizing all profiles in parallel (longest step)..."
+msgstr ""
+
+msgid "Generating top-reference blueprints..."
+msgstr ""
+
+msgid "two arcs + straight: done.  Waiting for the rest..."
+msgstr ""
+
+msgid "three slopes: done.  Waiting for the rest..."
+msgstr ""
+
+msgid "four slopes: done.  Waiting for the rest..."
+msgstr ""
+
+msgid "free-form smooth (PCHIP): done."
+msgstr ""
+
+msgid "Best parameters (two arcs + straight):"
+msgstr ""
+
+msgid "Live preview (linear ramp)"
+msgstr ""
+
+msgid "Linear ramp"
+msgstr ""
+
+msgid "rise {r:.0f} cm,  run {n:.0f} cm   ({pct:.1f} %,  {deg:.1f} degrees)"
+msgstr ""
+
+msgid "Concrete cost estimator (optional)"
+msgstr ""
+
+msgid "Ramp width:"
+msgstr ""
+
+msgid "Concrete cost per m^3:"
+msgstr ""
+
+msgid "(leave width or cost empty to skip the cost report)"
+msgstr ""
+
+msgid "Ramp width"
+msgstr ""
+
+msgid "Cost per m^3"
+msgstr ""
+
+msgid "Concrete-volume estimate (ramp width: {w:.0f} cm; slab from the floor up to the surface):"
+msgstr ""
+
+msgid "volume (m^3)"
+msgstr ""
+
+msgid "delta vs linear (m^3)"
+msgstr ""
+
+msgid "cost ({sym})"
+msgstr ""
+
+msgid "  (positive 'delta' = more concrete than the linear baseline)"
+msgstr ""
+
+msgid "  (rate used: {rate:.2f} {sym} per m^3)"
+msgstr ""
+
+msgid "Ramp width in cm (perpendicular to the slope direction). Used only by the optional concrete-volume cost estimator. Leave at 0 to skip the cost report."
+msgstr ""
+
+msgid "Cost per cubic metre of concrete in your currency, used by the optional cost estimator.  Leave at 0 to print only the volumes."
+msgstr ""
+
+msgid "Currency symbol shown next to the estimated cost (e.g. EUR, USD, GBP)."
+msgstr ""
+
+msgid "Profiles to optimize"
+msgstr ""
+
+msgid "Three slopes  (computationally harder, takes longer)"
+msgstr ""
+
+msgid "Pick at least one profile to optimise."
+msgstr ""
+
+msgid "Skip the two-arc + straight optimisation."
+msgstr ""
+
+msgid "Run the three-slope grid search.  Off by default; the result rarely beats the 4-slope or smooth profile."
+msgstr ""
+
+msgid "Skip the four-slope optimisation."
+msgstr ""
+
+msgid "Skip the free-form smooth (PCHIP) optimisation."
 msgstr ""

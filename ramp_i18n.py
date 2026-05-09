@@ -577,6 +577,109 @@ _TRANSLATIONS_ES: "dict[str, str]" = {
         "Calculando sensibilidad a la longitud de la rampa...",
     "Done. Blueprints and CSVs generated.":
         "Listo. Planos y CSV generados.",
+
+    # ---- Parallel-search log lines (added in v0.5+) ---------------- #
+    "Searching all profiles in parallel ({names}) ...":
+        "Buscando todos los perfiles en paralelo ({names}) ...",
+    "Searching all profiles in parallel ":
+        "Buscando todos los perfiles en paralelo ",
+    "none -- only the linear baseline will be reported":
+        "ninguno -- solo se mostrara la rampa lineal de referencia",
+    "  ... {name}: done.":
+        "  ... {name}: listo.",
+    "two arcs + straight":
+        "dos arcos + recta",
+    "three slopes":
+        "tres tramos rectos",
+    "four slopes":
+        "cuatro tramos rectos",
+    "free-form smooth (PCHIP)":
+        "curva suave libre (PCHIP)",
+    "Optimizing all profiles in parallel (longest step)...":
+        "Optimizando todos los perfiles en paralelo (paso mas largo)...",
+    "Generating top-reference blueprints...":
+        "Generando planos en sistema muro...",
+    "two arcs + straight: done.  Waiting for the rest...":
+        "dos arcos + recta: listo. Esperando al resto...",
+    "three slopes: done.  Waiting for the rest...":
+        "tres tramos rectos: listo. Esperando al resto...",
+    "four slopes: done.  Waiting for the rest...":
+        "cuatro tramos rectos: listo. Esperando al resto...",
+    "free-form smooth (PCHIP): done.":
+        "curva suave libre (PCHIP): listo.",
+    "Best parameters (two arcs + straight):":
+        "Mejores parametros (dos arcos + recta):",
+
+    # ---- Live linear-ramp preview (GUI, added in v0.6) ------------ #
+    "Live preview (linear ramp)":
+        "Vista previa en directo (rampa lineal)",
+    "Linear ramp":
+        "Rampa lineal",
+    "rise {r:.0f} cm,  run {n:.0f} cm   ({pct:.1f} %,  {deg:.1f} degrees)":
+        "desnivel {r:.0f} cm,  longitud {n:.0f} cm   ({pct:.1f} %,  {deg:.1f} grados)",
+
+    # ---- Concrete-volume cost estimator (added in v0.6) ----------- #
+    "Concrete cost estimator (optional)":
+        "Estimador de coste del hormigon (opcional)",
+    "Ramp width:":
+        "Ancho de la rampa:",
+    "Concrete cost per m^3:":
+        "Coste del hormigon por m^3:",
+    "(leave width or cost empty to skip the cost report)":
+        "(deja el ancho o el coste vacios para omitir el informe de coste)",
+    "Ramp width":
+        "Ancho de la rampa",
+    "Cost per m^3":
+        "Coste por m^3",
+    "Concrete-volume estimate (ramp width: {w:.0f} cm; "
+    "slab from the floor up to the surface):":
+        "Estimacion de volumen de hormigon (ancho de rampa: {w:.0f} cm; "
+        "losa desde el suelo hasta la superficie):",
+    "volume (m^3)":
+        "volumen (m^3)",
+    "delta vs linear (m^3)":
+        "delta vs lineal (m^3)",
+    "cost ({sym})":
+        "coste ({sym})",
+    "  (positive 'delta' = more concrete than the linear baseline)":
+        "  (delta positivo = mas hormigon que la rampa lineal de referencia)",
+    "  (rate used: {rate:.2f} {sym} per m^3)":
+        "  (precio usado: {rate:.2f} {sym} por m^3)",
+    "Ramp width in cm (perpendicular to the slope direction). "
+    "Used only by the optional concrete-volume cost estimator. "
+    "Leave at 0 to skip the cost report.":
+        "Ancho de la rampa en cm (perpendicular a la direccion de la "
+        "pendiente). Lo usa solo el estimador opcional de volumen de "
+        "hormigon. Deja 0 para omitir el informe de coste.",
+    "Cost per cubic metre of concrete in your currency, used "
+    "by the optional cost estimator.  Leave at 0 to print "
+    "only the volumes.":
+        "Coste por metro cubico de hormigon en tu moneda, usado por "
+        "el estimador opcional de coste. Deja 0 para mostrar solo los "
+        "volumenes.",
+    "Currency symbol shown next to the estimated cost "
+    "(e.g. EUR, USD, GBP).":
+        "Simbolo de la moneda mostrado junto al coste estimado "
+        "(p.ej. EUR, USD, GBP).",
+
+    # ---- Method-selection checkboxes / CLI flags (added in v0.6) - #
+    "Profiles to optimize":
+        "Perfiles a optimizar",
+    "Three slopes  (computationally harder, takes longer)":
+        "Tres tramos rectos  (mas costoso de calcular, tarda mas)",
+    "Pick at least one profile to optimise.":
+        "Selecciona al menos un perfil para optimizar.",
+    "Skip the two-arc + straight optimisation.":
+        "Omitir la optimizacion de dos arcos + recta.",
+    "Run the three-slope grid search.  Off by default; the "
+    "result rarely beats the 4-slope or smooth profile.":
+        "Ejecutar la busqueda en rejilla de tres tramos rectos. "
+        "Desactivada por defecto; el resultado rara vez supera al "
+        "perfil de 4 tramos o a la curva suave.",
+    "Skip the four-slope optimisation.":
+        "Omitir la optimizacion de cuatro tramos rectos.",
+    "Skip the free-form smooth (PCHIP) optimisation.":
+        "Omitir la optimizacion de la curva suave libre (PCHIP).",
 }
 
 
