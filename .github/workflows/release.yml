@@ -64,7 +64,8 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: "3.11"
-          cache: pip
+          # No pip cache: avoids burning Actions cache quota on each
+          # release build.
 
       - name: Install dependencies
         run: |
@@ -86,12 +87,21 @@ jobs:
           name: ${{ matrix.outname }}
           path: ${{ matrix.outname }}
           if-no-files-found: error
-          retention-days: 7
+          # The artifacts only need to live long enough for the
+          # publish-release job in the same workflow run to pick them up
+          # and attach them to the GitHub Release.  We delete them
+          # explicitly at the end of publish-release; the 1-day
+          # retention is just a fallback if the run aborts mid-way.
+          retention-days: 1
+          compression-level: 9
 
   publish-release:
     name: Publish GitHub Release
     needs: build-windows-exe
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
     steps:
       - name: Resolve target tag
         id: tag
@@ -152,3 +162,24 @@ jobs:
             Workarounds: add the file to your antivirus' exclusion
             list, or run the Python script directly without
             compiling — see [`CONTRIBUTING.md`](https://github.com/EfrenPy/garage-ramp-optimizer/blob/main/CONTRIBUTING.md).
+
+      - name: Delete intermediate workflow artifacts
+        # The .exe files now live on the GitHub Release itself, so the
+        # workflow-run artifacts are pure waste of Actions storage.
+        # Delete them explicitly so we do not depend on the (slow)
+        # retention-days expiry to free space.
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          echo "Listing artifacts for run ${{ github.run_id }}..."
+          IDS=$(gh api -X GET \
+            "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts" \
+            --jq '.artifacts[].id')
+          for id in $IDS; do
+            echo "Deleting artifact $id"
+            gh api -X DELETE \
+              "repos/${{ github.repository }}/actions/artifacts/$id" \
+              || echo "  (already gone, ignoring)"
+          done

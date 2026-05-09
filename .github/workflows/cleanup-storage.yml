@@ -1,0 +1,89 @@
+name: Cleanup Actions storage
+
+# Manual workflow to free up GitHub Actions storage by deleting:
+#   * every workflow-run artifact in this repository
+#   * every Actions cache entry in this repository
+#
+# Trigger from the Actions tab -> "Cleanup Actions storage" -> Run workflow.
+# (No release assets are touched -- those live on the Releases page, not in
+# Actions storage.)
+
+on:
+  workflow_dispatch:
+    inputs:
+      delete_artifacts:
+        description: "Delete all workflow-run artifacts"
+        type: boolean
+        default: true
+      delete_caches:
+        description: "Delete all Actions caches"
+        type: boolean
+        default: true
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete all workflow artifacts
+        if: ${{ inputs.delete_artifacts }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          echo "Enumerating artifacts for ${{ github.repository }}..."
+          # Pull every artifact id (paginated).
+          IDS=$(gh api --paginate \
+            "repos/${{ github.repository }}/actions/artifacts" \
+            --jq '.artifacts[].id')
+          if [ -z "$IDS" ]; then
+            echo "No artifacts to delete."
+            exit 0
+          fi
+          COUNT=$(echo "$IDS" | wc -l)
+          echo "Deleting $COUNT artifacts..."
+          for id in $IDS; do
+            gh api -X DELETE \
+              "repos/${{ github.repository }}/actions/artifacts/$id" \
+              || echo "  artifact $id already gone"
+          done
+          echo "Artifact cleanup complete."
+
+      - name: Delete all Actions caches
+        if: ${{ inputs.delete_caches }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          echo "Enumerating caches for ${{ github.repository }}..."
+          IDS=$(gh api --paginate \
+            "repos/${{ github.repository }}/actions/caches" \
+            --jq '.actions_caches[].id')
+          if [ -z "$IDS" ]; then
+            echo "No caches to delete."
+            exit 0
+          fi
+          COUNT=$(echo "$IDS" | wc -l)
+          echo "Deleting $COUNT caches..."
+          for id in $IDS; do
+            gh api -X DELETE \
+              "repos/${{ github.repository }}/actions/caches/$id" \
+              || echo "  cache $id already gone"
+          done
+          echo "Cache cleanup complete."
+
+      - name: Show remaining storage
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "Remaining artifacts:"
+          gh api --paginate \
+            "repos/${{ github.repository }}/actions/artifacts" \
+            --jq '.total_count' || true
+          echo "Remaining caches:"
+          gh api --paginate \
+            "repos/${{ github.repository }}/actions/caches" \
+            --jq '.total_count' || true

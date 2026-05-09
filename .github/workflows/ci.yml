@@ -29,7 +29,9 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
-          cache: pip
+          # No pip cache: the GitHub Actions cache fills up our quota
+          # quickly, and a fresh "pip install -r requirements.txt" is
+          # only ~30 s on the warm runners we use.
 
       - name: Install dependencies
         run: |
