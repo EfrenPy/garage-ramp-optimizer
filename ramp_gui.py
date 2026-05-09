@@ -69,7 +69,9 @@ def launch_gui() -> None:
     sw = root.winfo_screenwidth()
     sh = root.winfo_screenheight()
     target_w = min(960, max(680, int(sw * 0.85)))
-    target_h = min(820, max(540, int(sh * 0.80)))
+    # Leave ~80 px for the Windows taskbar / macOS dock.  The
+    # scrollable wrapper handles whatever does not fit inside.
+    target_h = min(900, max(540, sh - 80))
     pos_x = max(0, (sw - target_w) // 2)
     pos_y = max(0, (sh - target_h) // 2 - 24)
     root.geometry(f"{target_w}x{target_h}+{pos_x}+{pos_y}")
@@ -110,8 +112,70 @@ def launch_gui() -> None:
     style.configure("TEntry", font=BASE_FONT)
     style.configure("TCheckbutton", font=BASE_FONT)
 
+    # ---- Scrollable wrapper -------------------------------------------- #
+    # The GUI's natural height (header + 2-column inputs + preview +
+    # output folder + Calculate row + output text + bottom buttons) is
+    # taller than a 1366x768 / 1280x800 laptop screen.  Wrapping
+    # everything in a Canvas + Scrollbar lets the user scroll down to
+    # the Calculate button when the window does not fit.  ``content``
+    # is the ttk.Frame that holds every subsequent widget; ``root``
+    # only owns the canvas-and-scrollbar pair.
+    outer = ttk.Frame(root)
+    outer.pack(fill="both", expand=True)
+
+    scroll_canvas = tk.Canvas(outer, highlightthickness=0, borderwidth=0)
+    vscroll = ttk.Scrollbar(outer, orient="vertical",
+                              command=scroll_canvas.yview)
+    scroll_canvas.configure(yscrollcommand=vscroll.set)
+    vscroll.pack(side="right", fill="y")
+    scroll_canvas.pack(side="left", fill="both", expand=True)
+
+    content = ttk.Frame(scroll_canvas)
+    content_window_id = scroll_canvas.create_window(
+        (0, 0), window=content, anchor="nw",
+    )
+
+    def _on_canvas_resize(event):
+        # Stretch the inner content frame to the canvas's width so child
+        # widgets (especially LabelFrames packed with fill="x") fill the
+        # available horizontal space.
+        scroll_canvas.itemconfigure(content_window_id, width=event.width)
+
+    def _on_content_resize(_event):
+        # Update the scroll region whenever the inner content's bbox
+        # changes (e.g. after fonts load or the user resizes a frame).
+        scroll_canvas.configure(scrollregion=scroll_canvas.bbox("all"))
+
+    scroll_canvas.bind("<Configure>", _on_canvas_resize)
+    content.bind("<Configure>", _on_content_resize)
+
+    # Mouse-wheel scrolling.  We bind globally so the wheel works no
+    # matter where the cursor sits on the GUI -- with one exception:
+    # if the cursor is over the calculation-output Text widget, leave
+    # the event alone so the Text widget can scroll its own content.
+    def _on_mousewheel(event):
+        w = event.widget
+        # Tk passes the widget that received the event; walk up to the
+        # nearest Text ancestor (if any) and bow out so the Text widget
+        # keeps its native wheel handling.
+        cur = w
+        while cur is not None:
+            if isinstance(cur, tk.Text):
+                return
+            cur = getattr(cur, "master", None)
+        if event.delta:
+            scroll_canvas.yview_scroll(int(-event.delta / 120), "units")
+        elif event.num == 5:
+            scroll_canvas.yview_scroll(1, "units")
+        elif event.num == 4:
+            scroll_canvas.yview_scroll(-1, "units")
+
+    scroll_canvas.bind_all("<MouseWheel>", _on_mousewheel)
+    scroll_canvas.bind_all("<Button-4>", _on_mousewheel)
+    scroll_canvas.bind_all("<Button-5>", _on_mousewheel)
+
     # ---- Header --------------------------------------------------------- #
-    header = ttk.Frame(root, padding=(14, 12, 14, 4))
+    header = ttk.Frame(content, padding=(14, 12, 14, 4))
     header.pack(fill="x")
     ttk.Label(header, text=t("Garage Ramp Optimizer"),
               font=HEADER_FONT).pack(anchor="w")
@@ -122,14 +186,14 @@ def launch_gui() -> None:
     link.pack(anchor="w")
     link.bind("<Button-1>", lambda _e: webbrowser.open(URL))
 
-    ttk.Separator(root).pack(fill="x", padx=10)
+    ttk.Separator(content).pack(fill="x", padx=10)
 
     # ---- 2-column inputs container ------------------------------------- #
     # All four input frames (ramp, car, cost, methods) live in a single
     # 2-column grid so they take roughly half the vertical space they
     # would in a stacked layout.  This keeps the Calculate button on
     # screen even on 720p / 800p laptop displays.
-    inputs_frame = ttk.Frame(root, padding=(14, 6, 14, 0))
+    inputs_frame = ttk.Frame(content, padding=(14, 6, 14, 0))
     inputs_frame.pack(fill="x")
     inputs_frame.columnconfigure(0, weight=1, uniform="cols")
     inputs_frame.columnconfigure(1, weight=1, uniform="cols")
@@ -352,7 +416,7 @@ def launch_gui() -> None:
     # Keep it short (1.4 in) so the Calculate button stays on screen.
     if preview_ok:
         preview_frame = ttk.LabelFrame(
-            root, text=t("Live preview (linear ramp)"), padding=4,
+            content, text=t("Live preview (linear ramp)"), padding=4,
         )
         preview_frame.pack(fill="x", padx=14, pady=(4, 4))
         preview_fig = Figure(figsize=(8, 1.4), dpi=100)
@@ -362,7 +426,7 @@ def launch_gui() -> None:
 
     # ---- Output folder -------------------------------------------------- #
     folder_frame = ttk.LabelFrame(
-        root, text=t("Output folder for the blueprints and CSV files"),
+        content, text=t("Output folder for the blueprints and CSV files"),
         padding=10,
     )
     folder_frame.pack(fill="x", padx=14, pady=4)
@@ -381,7 +445,7 @@ def launch_gui() -> None:
                command=choose_folder).grid(row=0, column=1, padx=4)
 
     # ---- Calculate button + status ------------------------------------- #
-    action_frame = ttk.Frame(root, padding=(14, 6))
+    action_frame = ttk.Frame(content, padding=(14, 6))
     action_frame.pack(fill="x")
     calc_btn = ttk.Button(action_frame,
                            text=t("Calculate and generate blueprints"))
@@ -398,7 +462,7 @@ def launch_gui() -> None:
               font=("Segoe UI", 12, "italic")).pack(side="left")
 
     # Elapsed-time line.
-    time_frame = ttk.Frame(root, padding=(14, 0))
+    time_frame = ttk.Frame(content, padding=(14, 0))
     time_frame.pack(fill="x")
     time_var = tk.StringVar(value="")
     ttk.Label(time_frame, textvariable=time_var,
@@ -409,7 +473,7 @@ def launch_gui() -> None:
     # tabular output never gets clipped if the window is shrunk to a
     # narrow size.  ``wrap="none"`` preserves the column alignment of the
     # numerical reports.
-    results_frame = ttk.LabelFrame(root, text=t("Calculation output"),
+    results_frame = ttk.LabelFrame(content, text=t("Calculation output"),
                                      padding=4)
     results_frame.pack(fill="both", expand=True, padx=14, pady=(4, 8))
     results_frame.rowconfigure(0, weight=1)
@@ -430,7 +494,7 @@ def launch_gui() -> None:
     txt_scroll_x.config(command=results_text.xview)
 
     # ---- Bottom buttons ------------------------------------------------ #
-    bottom = ttk.Frame(root, padding=(14, 4, 14, 12))
+    bottom = ttk.Frame(content, padding=(14, 4, 14, 12))
     bottom.pack(fill="x")
 
     def open_results_folder():
