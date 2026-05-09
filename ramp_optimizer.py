@@ -117,6 +117,23 @@ import sys
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 
+# Pin numerical-library thread counts BEFORE importing numpy/scipy so the
+# optimiser is bit-for-bit reproducible across runs.  Multi-threaded BLAS
+# (OpenBLAS, MKL, Accelerate) re-orders floating-point summations between
+# threads, which can perturb differential_evolution's convergence path and
+# polish step enough to land on visibly different smooth-curve optima even
+# with a fixed seed.
+for _var in (
+    "OPENBLAS_NUM_THREADS",
+    "MKL_NUM_THREADS",
+    "OMP_NUM_THREADS",
+    "NUMEXPR_NUM_THREADS",
+    "VECLIB_MAXIMUM_THREADS",
+    "BLIS_NUM_THREADS",
+):
+    os.environ.setdefault(_var, "1")
+del _var
+
 import numpy as np
 
 # --------------------------------------------------------------------------- #
@@ -515,9 +532,16 @@ def search_n_slope(
         score = min(m["chassis_min"], m["overhang_min"])
         return -score
 
+    # Use the legacy RandomState here -- the existing seed (7) was tuned
+    # against scipy's default RandomState behaviour, and switching to
+    # ``default_rng`` shifts the RNG stream onto a different PCG64
+    # sequence, which lands DE in a worse 4-slope optimum for the typical
+    # garage geometry.  Passing the RandomState explicitly also avoids
+    # the scipy 1.15+ deprecation warning attached to ``seed=int``.
     result = differential_evolution(
         objective, bounds,
-        maxiter=de_maxiter, popsize=de_popsize, seed=seed,
+        maxiter=de_maxiter, popsize=de_popsize,
+        seed=np.random.RandomState(seed),
         tol=1e-3, mutation=(0.4, 1.2), recombination=0.85,
         polish=True, workers=1, updating="deferred",
     )
@@ -630,9 +654,16 @@ def search_smooth(
         score = min(m["chassis_min"], m["overhang_min"])
         return -score
 
+    # Use modern PCG64 via ``default_rng`` for the smooth search -- it
+    # samples the design space differently from the legacy MT19937 and
+    # in our geometry it consistently finds a better (less-scratching)
+    # PCHIP optimum.  Passing a Generator explicitly also pins the RNG
+    # stream, so consecutive runs of the same input cannot land on
+    # different control points.
     result = differential_evolution(
         objective, bounds,
-        maxiter=de_maxiter, popsize=de_popsize, seed=seed,
+        maxiter=de_maxiter, popsize=de_popsize,
+        seed=np.random.default_rng(seed),
         tol=1e-3, mutation=(0.4, 1.3), recombination=0.85,
         polish=True, workers=1, updating="deferred",
     )

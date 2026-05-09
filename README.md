@@ -125,13 +125,13 @@ front overhang 87 cm) on a 136 cm rise over 540 cm of run:
 | Two arcs + straight | −12.8 cm |
 | Three slopes | −2.3 cm |
 | Four slopes | −1.2 cm |
-| **Free-form smooth curve (PCHIP)** | **−0.5 cm** |
+| **Free-form smooth curve (PCHIP)** | **−0.14 cm** |
 
 (Negative = the car scrapes that many cm somewhere along the ramp.)
 
 The current run length cannot reach zero scraping without lengthening
 the ramp by about 200 cm more, but the smooth curve already leaves
-just 5 mm of interference, essentially imperceptible.
+just over 1 mm of interference, essentially imperceptible.
 
 ## Languages
 
