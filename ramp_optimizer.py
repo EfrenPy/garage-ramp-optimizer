@@ -1858,9 +1858,16 @@ def draw_smooth_blueprint_topref(
     ys_st = np.interp(xs_st, x_curve, y_curve)
     ds_st = ramp.rise - ys_st
 
-    fig = plt.figure(figsize=(22, 17))
+    # Match the floor-reference smooth blueprint's vertical layout: the
+    # measurement table for ~20 stations needs the lower 36 % of the
+    # figure to itself, with a clear gap above so it never overlaps the
+    # working drawing.  An earlier version put the table at y=[0.03,
+    # 0.29] against a plot ending at y=0.30, leaving only a 1 % gap --
+    # which collapses to a visible overlap as soon as the table grows
+    # to 18+ rows.
+    fig = plt.figure(figsize=(22, 19))
     gs = fig.add_gridspec(
-        2, 1, left=0.06, right=0.98, top=0.95, bottom=0.30,
+        2, 1, left=0.06, right=0.98, top=0.94, bottom=0.42,
         hspace=0.30, height_ratios=[1.0, 4.4],
     )
     ax_true = fig.add_subplot(gs[0, 0])
@@ -1938,8 +1945,31 @@ def draw_smooth_blueprint_topref(
 
     ax.legend(loc="lower left", fontsize=11)
 
-    # Table at the bottom.
-    _topref_table(fig, table_rows, n_cols=5)
+    # Table at the bottom.  Inline (not via ``_topref_table``) so we
+    # can position it inside the gap left by the new bottom=0.42
+    # gridspec margin without affecting the smaller piecewise / 3-slope
+    # blueprints that still use the helper.
+    col_labels = list(table_rows[0])
+    rows = list(table_rows[1:])
+    ax_table = fig.add_axes([0.05, 0.02, 0.92, 0.36])
+    ax_table.set_axis_off()
+    table = ax_table.table(
+        cellText=rows, colLabels=col_labels,
+        loc="center", cellLoc="left", colLoc="left",
+    )
+    table.auto_set_font_size(False)
+    table.set_fontsize(10)
+    table.scale(1.0, 1.5)
+    n_table_cols = len(col_labels)
+    for c in range(n_table_cols):
+        cell = table[(0, c)]
+        cell.set_text_props(fontweight="bold")
+        cell.set_facecolor("#e6e6e6")
+    for r_idx in range(1, len(rows) + 1):
+        for c in range(n_table_cols):
+            table[(r_idx, c)].set_facecolor(
+                "#fff8e0" if r_idx % 2 else "#fffefa"
+            )
 
     fig.suptitle(
         t("Construction blueprint (reference: wall and top plane) - "
