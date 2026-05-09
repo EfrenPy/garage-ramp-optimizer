@@ -244,6 +244,37 @@ def launch_gui() -> None:
     voladizo_t_var = _entry(car_frame, 3,
                               t("Rear overhang (0 if it does not scrape):"), 0)
 
+    # ---- Methods to optimize ------------------------------------------- #
+    # The user can pick which profile searches to run.  3-slope is OFF
+    # by default because its result is almost always worse than the
+    # 4-slope / smooth profile on realistic ramp dimensions.
+    methods_frame = ttk.LabelFrame(
+        root, text=t("Profiles to optimize"), padding=10,
+    )
+    methods_frame.pack(fill="x", padx=14, pady=4)
+
+    enable_2arc_var = tk.BooleanVar(value=True)
+    enable_3slope_var = tk.BooleanVar(value=False)
+    enable_4slope_var = tk.BooleanVar(value=True)
+    enable_smooth_var = tk.BooleanVar(value=True)
+
+    ttk.Checkbutton(
+        methods_frame, variable=enable_2arc_var,
+        text=t("Two arcs + straight"),
+    ).grid(row=0, column=0, sticky="w", padx=6, pady=2)
+    ttk.Checkbutton(
+        methods_frame, variable=enable_4slope_var,
+        text=t("Four slopes"),
+    ).grid(row=0, column=1, sticky="w", padx=12, pady=2)
+    ttk.Checkbutton(
+        methods_frame, variable=enable_smooth_var,
+        text=t("Free-form smooth curve (PCHIP)"),
+    ).grid(row=1, column=0, columnspan=2, sticky="w", padx=6, pady=2)
+    ttk.Checkbutton(
+        methods_frame, variable=enable_3slope_var,
+        text=t("Three slopes  (computationally harder, takes longer)"),
+    ).grid(row=2, column=0, columnspan=2, sticky="w", padx=6, pady=2)
+
     # ---- Concrete cost estimator (optional) ---------------------------- #
     # Both fields are optional: leave them empty to skip the cost report.
     cost_frame = ttk.LabelFrame(
@@ -385,8 +416,10 @@ def launch_gui() -> None:
         return t(en)
 
     STAGES = [
-        (_trig("Searching all profiles in parallel "
-                 "(2-arc, 3-slope, 4-slope, smooth) ..."),
+        # Match the localized prefix of the parallel-search log line.
+        # The full sentence varies by selected methods, so we anchor on
+        # the prefix that is always present.
+        (_trig("Searching all profiles in parallel "),
          5,  t("Optimizing all profiles in parallel "
                 "(longest step)...")),
         (_trig("Optimal three-segment ramp (two arcs + straight)"),
@@ -447,7 +480,8 @@ def launch_gui() -> None:
         def flush(self) -> None:
             return
 
-    def _worker(ramp, car, out_dir, ramp_width, cost_per_m3, currency):
+    def _worker(ramp, car, out_dir, ramp_width, cost_per_m3, currency,
+                enable_2arc, enable_3slope, enable_4slope, enable_smooth):
         try:
             cwd = os.getcwd()
             os.chdir(out_dir)
@@ -460,6 +494,10 @@ def launch_gui() -> None:
                         ramp_width_cm=ramp_width,
                         cost_per_m3=cost_per_m3,
                         currency=currency,
+                        enable_2arc=enable_2arc,
+                        enable_3slope=enable_3slope,
+                        enable_4slope=enable_4slope,
+                        enable_smooth=enable_smooth,
                     )
             finally:
                 os.chdir(cwd)
@@ -628,9 +666,21 @@ def launch_gui() -> None:
         start_time[0] = time.time()
         root.after(1000, _tick_elapsed)
 
+        # Snapshot the method checkboxes at click time so the worker
+        # gets a stable view (the user may toggle while it runs).
+        if not (enable_2arc_var.get() or enable_3slope_var.get()
+                or enable_4slope_var.get() or enable_smooth_var.get()):
+            messagebox.showerror(
+                t("Invalid data"),
+                t("Pick at least one profile to optimise."),
+            )
+            return
+
         thread = threading.Thread(
             target=_worker,
-            args=(ramp, car, out_dir, ramp_width_v, cost_v, currency_v),
+            args=(ramp, car, out_dir, ramp_width_v, cost_v, currency_v,
+                  enable_2arc_var.get(), enable_3slope_var.get(),
+                  enable_4slope_var.get(), enable_smooth_var.get()),
             daemon=True,
         )
         thread.start()

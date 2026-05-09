@@ -2815,7 +2815,8 @@ def _ask_float(prompt: str, default: float | None = None,
         return value
 
 
-def parse_inputs() -> tuple["Ramp", "Car", float, float, str]:
+def parse_inputs() -> tuple["Ramp", "Car", float, float, str,
+                              bool, bool, bool, bool]:
     """
     Reads the ramp and car parameters from the command line, or asks for
     them on the console if missing.
@@ -2885,6 +2886,30 @@ def parse_inputs() -> tuple["Ramp", "Car", float, float, str]:
         "--currency", dest="currency", type=str, default="EUR",
         help=t("Currency symbol shown next to the estimated cost "
                 "(e.g. EUR, USD, GBP)."),
+    )
+    # Method selection.  3-slope is OFF by default because it is
+    # almost always beaten by the 4-slope and the smooth profile;
+    # the user can opt back in with --enable-3slope.
+    parser.add_argument(
+        "--no-2arc", dest="enable_2arc",
+        action="store_false", default=True,
+        help=t("Skip the two-arc + straight optimisation."),
+    )
+    parser.add_argument(
+        "--enable-3slope", "--3slope", dest="enable_3slope",
+        action="store_true", default=False,
+        help=t("Run the three-slope grid search.  Off by default; the "
+                "result rarely beats the 4-slope or smooth profile."),
+    )
+    parser.add_argument(
+        "--no-4slope", dest="enable_4slope",
+        action="store_false", default=True,
+        help=t("Skip the four-slope optimisation."),
+    )
+    parser.add_argument(
+        "--no-smooth", dest="enable_smooth",
+        action="store_false", default=True,
+        help=t("Skip the free-form smooth (PCHIP) optimisation."),
     )
     parser.add_argument(
         "--lang", choices=["en", "es"], default=None,
@@ -2965,16 +2990,26 @@ def parse_inputs() -> tuple["Ramp", "Car", float, float, str]:
         rear_overhang=args.rear_overhang,
     )
     ramp = Ramp(rise=args.desnivel, run=args.longitud)
-    return ramp, car, args.ramp_width, args.cost_per_m3, args.currency
+    return (ramp, car, args.ramp_width, args.cost_per_m3, args.currency,
+            args.enable_2arc, args.enable_3slope,
+            args.enable_4slope, args.enable_smooth)
 
 
 def main() -> None:
     """Punto de entrada CLI: lee parametros y llama a compute_and_save."""
-    ramp, car, ramp_width, cost_per_m3, currency = parse_inputs()
-    compute_and_save(ramp, car,
-                     ramp_width_cm=ramp_width,
-                     cost_per_m3=cost_per_m3,
-                     currency=currency)
+    (ramp, car, ramp_width, cost_per_m3, currency,
+     enable_2arc, enable_3slope,
+     enable_4slope, enable_smooth) = parse_inputs()
+    compute_and_save(
+        ramp, car,
+        ramp_width_cm=ramp_width,
+        cost_per_m3=cost_per_m3,
+        currency=currency,
+        enable_2arc=enable_2arc,
+        enable_3slope=enable_3slope,
+        enable_4slope=enable_4slope,
+        enable_smooth=enable_smooth,
+    )
 
 
 def compute_and_save(
@@ -2982,6 +3017,10 @@ def compute_and_save(
     ramp_width_cm: float = 0.0,
     cost_per_m3: float = 0.0,
     currency: str = "EUR",
+    enable_2arc: bool = True,
+    enable_3slope: bool = False,
+    enable_4slope: bool = True,
+    enable_smooth: bool = True,
 ) -> None:
     """Run every search, generate every file (PNG, PDF, CSV) in the
     current working directory.  Called from both the CLI and the GUI."""
@@ -3007,95 +3046,113 @@ def compute_and_save(
 
     # ---- All optimizations in parallel ---------------------------------- #
     # Every search is independent of the others, so we fan them out over
-    # up to 4 worker processes and gather the results before printing the
-    # full report.  This keeps wall-clock time roughly equal to the longest
-    # single search (the smooth PCHIP optimisation) instead of the sum of
-    # all four.
-    print(t("Searching all profiles in parallel "
-            "(2-arc, 3-slope, 4-slope, smooth) ..."))
-    best4 = None
-    best_smooth = None
-    parallel_jobs = [
-        ("arc", search, (ramp, car)),
-        ("three", search_three_slope, (ramp, car, 11, 0.0)),
-    ]
-    if HAS_SCIPY:
+    # up to N worker processes (one per enabled method) and gather the
+    # results before printing the full report.  This keeps wall-clock
+    # time roughly equal to the longest single search.  ``enable_*``
+    # flags let the caller skip an entire profile -- handy when, for
+    # instance, the 3-slope geometry consistently scores worse than
+    # the 4-slope on the user's specific ramp dimensions.
+    parallel_jobs = []
+    if enable_2arc:
+        parallel_jobs.append(("arc", search, (ramp, car)))
+    if enable_3slope:
+        parallel_jobs.append(("three", search_three_slope,
+                              (ramp, car, 11, 0.0)))
+    if HAS_SCIPY and enable_4slope:
         parallel_jobs.append(("four", search_n_slope, (ramp, car, 4, 0.0)))
+    if HAS_SCIPY and enable_smooth:
         parallel_jobs.append(("smooth", search_smooth, (ramp, car, 5)))
+
+    enabled_names = []
+    if enable_2arc:        enabled_names.append("2-arc")
+    if enable_3slope:      enabled_names.append("3-slope")
+    if HAS_SCIPY and enable_4slope:  enabled_names.append("4-slope")
+    if HAS_SCIPY and enable_smooth:  enabled_names.append("smooth")
+    print(t("Searching all profiles in parallel ({names}) ...").format(
+        names=", ".join(enabled_names) or t("none -- only the linear "
+                                              "baseline will be reported"),
+    ))
+
     job_label = {
         "arc":    t("two arcs + straight"),
         "three":  t("three slopes"),
         "four":   t("four slopes"),
         "smooth": t("free-form smooth (PCHIP)"),
     }
-    results = {}
-    with ProcessPoolExecutor(max_workers=len(parallel_jobs)) as pool:
-        future_to_key = {
-            pool.submit(fn, *args): key
-            for key, fn, args in parallel_jobs
-        }
-        for fut in as_completed(future_to_key):
-            key = future_to_key[fut]
-            results[key] = fut.result()
-            print(t("  ... {name}: done.").format(name=job_label[key]))
+    results: dict = {}
+    if parallel_jobs:
+        with ProcessPoolExecutor(max_workers=len(parallel_jobs)) as pool:
+            future_to_key = {
+                pool.submit(fn, *args): key
+                for key, fn, args in parallel_jobs
+            }
+            for fut in as_completed(future_to_key):
+                key = future_to_key[fut]
+                results[key] = fut.result()
+                print(t("  ... {name}: done.").format(name=job_label[key]))
     print()
 
-    best = results["arc"]
-    best3 = results["three"]
-    if HAS_SCIPY:
-        best4 = results["four"]
-        best_smooth = results["smooth"]
+    best = results.get("arc")
+    best3 = results.get("three")
+    best4 = results.get("four")
+    best_smooth = results.get("smooth")
 
     # ---- Two arcs + straight middle ------------------------------------- #
-    print(t("Best parameters (two arcs + straight):"))
-    print(t("  theta (max slope of the straight middle)  = {deg:.2f} "
-            "degrees   (tan = {pct:.1f} %)").format(
-        deg=best["theta_deg"], pct=math.tan(best["theta"]) * 100,
-    ))
-    print(t("  R_bottom (lower-arc radius)               = {value:7.1f} cm"
-            ).format(value=best["r_bot"]))
-    print(t("  R_top    (upper-arc radius)               = {value:7.1f} cm"
-            ).format(value=best["r_top"]))
-    print(t("  Length of the straight middle (along ramp) = {value:7.1f} cm"
-            ).format(value=best["L_m"]))
-    print()
-    print(t("Segment endpoints (cm):"))
-    print(t("  start of bottom arc      : x =   0.0,  y =   0.0"))
-    print(t("  bottom arc -> straight   : x = {x:5.1f},  y = {y:5.1f}"
-            ).format(x=best["x_b_end"], y=best["y_b_end"]))
-    print(t("  straight -> top arc      : x = {x:5.1f},  y = {y:5.1f}"
-            ).format(x=best["x_m_end"], y=best["y_m_end"]))
-    print(t("  end of top arc           : x = {x:5.1f},  y = {y:5.1f}"
-            ).format(x=ramp.run, y=ramp.rise))
-    print()
-    report(t("Optimal three-segment ramp (two arcs + straight)"), best)
+    if best is not None:
+        print(t("Best parameters (two arcs + straight):"))
+        print(t("  theta (max slope of the straight middle)  = {deg:.2f} "
+                "degrees   (tan = {pct:.1f} %)").format(
+            deg=best["theta_deg"], pct=math.tan(best["theta"]) * 100,
+        ))
+        print(t("  R_bottom (lower-arc radius)               = {value:7.1f} cm"
+                ).format(value=best["r_bot"]))
+        print(t("  R_top    (upper-arc radius)               = {value:7.1f} cm"
+                ).format(value=best["r_top"]))
+        print(t("  Length of the straight middle (along ramp) = "
+                "{value:7.1f} cm").format(value=best["L_m"]))
+        print()
+        print(t("Segment endpoints (cm):"))
+        print(t("  start of bottom arc      : x =   0.0,  y =   0.0"))
+        print(t("  bottom arc -> straight   : x = {x:5.1f},  y = {y:5.1f}"
+                ).format(x=best["x_b_end"], y=best["y_b_end"]))
+        print(t("  straight -> top arc      : x = {x:5.1f},  y = {y:5.1f}"
+                ).format(x=best["x_m_end"], y=best["y_m_end"]))
+        print(t("  end of top arc           : x = {x:5.1f},  y = {y:5.1f}"
+                ).format(x=ramp.run, y=ramp.rise))
+        print()
+        report(t("Optimal three-segment ramp (two arcs + straight)"), best)
 
-    write_offsets(_output_name("csv_2arc", ".csv"), best["x"], best["y"])
+        write_offsets(_output_name("csv_2arc", ".csv"),
+                      best["x"], best["y"])
 
     # ---- 3 piecewise-linear slopes -------------------------------------- #
-    print(t("Best parameters (3 slopes):"))
-    print(t("  break point 1:  x1 = {x:5.1f} cm,  y1 = {y:5.2f} cm"
-            ).format(x=best3["x1"], y=best3["y1"]))
-    print(t("  break point 2:  x2 = {x:5.1f} cm,  y2 = {y:5.2f} cm"
-            ).format(x=best3["x2"], y=best3["y2"]))
-    print(t("  slope 1 (bottom):    {deg:5.2f} degrees ({pct:.1f} %)"
-            ).format(deg=best3["slope1_deg"],
-                     pct=100*math.tan(math.radians(best3["slope1_deg"]))))
-    print(t("  slope 2 (middle):    {deg:5.2f} degrees ({pct:.1f} %)"
-            ).format(deg=best3["slope2_deg"],
-                     pct=100*math.tan(math.radians(best3["slope2_deg"]))))
-    print(t("  slope 3 (top):       {deg:5.2f} degrees ({pct:.1f} %)"
-            ).format(deg=best3["slope3_deg"],
-                     pct=100*math.tan(math.radians(best3["slope3_deg"]))))
-    print(t("  fillet radius at every kink: {fillet:.0f} cm"
-            ).format(fillet=best3["fillet"]))
-    print()
-    report(t("Optimal three-slope ramp"), best3)
-    write_offsets(_output_name("csv_3slope", ".csv"), best3["x"], best3["y"], n=28)
-    draw_three_slope_blueprint(ramp, best3, _output_name("blueprint_3slope", ".png"))
+    if best3 is not None:
+        print(t("Best parameters (3 slopes):"))
+        print(t("  break point 1:  x1 = {x:5.1f} cm,  y1 = {y:5.2f} cm"
+                ).format(x=best3["x1"], y=best3["y1"]))
+        print(t("  break point 2:  x2 = {x:5.1f} cm,  y2 = {y:5.2f} cm"
+                ).format(x=best3["x2"], y=best3["y2"]))
+        print(t("  slope 1 (bottom):    {deg:5.2f} degrees ({pct:.1f} %)"
+                ).format(deg=best3["slope1_deg"],
+                         pct=100*math.tan(math.radians(best3["slope1_deg"]))))
+        print(t("  slope 2 (middle):    {deg:5.2f} degrees ({pct:.1f} %)"
+                ).format(deg=best3["slope2_deg"],
+                         pct=100*math.tan(math.radians(best3["slope2_deg"]))))
+        print(t("  slope 3 (top):       {deg:5.2f} degrees ({pct:.1f} %)"
+                ).format(deg=best3["slope3_deg"],
+                         pct=100*math.tan(math.radians(best3["slope3_deg"]))))
+        print(t("  fillet radius at every kink: {fillet:.0f} cm"
+                ).format(fillet=best3["fillet"]))
+        print()
+        report(t("Optimal three-slope ramp"), best3)
+        write_offsets(_output_name("csv_3slope", ".csv"),
+                      best3["x"], best3["y"], n=28)
+        draw_three_slope_blueprint(
+            ramp, best3, _output_name("blueprint_3slope", ".png"),
+        )
 
     # ---- 4 slopes + free-form smooth curve ------------------------------ #
-    if HAS_SCIPY:
+    if HAS_SCIPY and best4 is not None and best_smooth is not None:
         print(t("Best parameters (4 slopes):"))
         for k, (xb, yb) in enumerate(best4["breaks"], start=1):
             print(t("  break point {k}:  x{k} = {x:5.1f} cm,  "
@@ -3242,11 +3299,11 @@ def compute_and_save(
         head_bumper = "paragol.".rjust(9)
         head_score = "peor".rjust(8)
     print(f"  {head_perfil:<32}  {head_bajo}  {head_bumper}  {head_score}")
-    candidates = [
-        (t("Linear ramp (current)"),         res_lin),
-        (t("Two arcs + straight"),           best),
-        (t("Three slopes"),                  best3),
-    ]
+    candidates = [(t("Linear ramp (current)"), res_lin)]
+    if best is not None:
+        candidates.append((t("Two arcs + straight"), best))
+    if best3 is not None:
+        candidates.append((t("Three slopes"), best3))
     if best4 is not None:
         candidates.append((t("Four slopes"), best4))
     if best_smooth is not None:
@@ -3298,53 +3355,55 @@ def compute_and_save(
     # 3-slope blueprint with the wall / top-of-ramp reference.
     # Default wall height: 136 cm above the upper flat (street).
     WALL_OFFSET_OVER_TOP = 136.0
-    draw_three_slope_blueprint_topref(
-        ramp, best3,
-        wall_height_above_top=WALL_OFFSET_OVER_TOP,
-        path=_output_name("blueprint_3slope_top", ".png"),
-    )
+    if best3 is not None:
+        draw_three_slope_blueprint_topref(
+            ramp, best3,
+            wall_height_above_top=WALL_OFFSET_OVER_TOP,
+            path=_output_name("blueprint_3slope_top", ".png"),
+        )
 
-    # 3-slope (u, d) top-reference CSV.
-    u_arr = ramp.run - best3["x"]
-    d_arr = ramp.rise - best3["y"]
-    order = np.argsort(u_arr)
-    u_arr = u_arr[order]
-    d_arr = d_arr[order]
-    us_top = np.linspace(0.0, u_arr[-1], 28)
-    ds_top = np.interp(us_top, u_arr, d_arr)
-    csv_3slope_top = _output_name("csv_3slope_top", ".csv")
-    with open(csv_3slope_top, "w", newline="") as f:
-        w = csv.writer(f)
-        w.writerow([
-            "u_cm_from_top_edge",
-            "d_cm_below_top_plane",
-            "drop_cm_from_wall",
-        ])
-        for ui, di in zip(us_top, ds_top):
-            w.writerow([f"{ui:.2f}", f"{di:.2f}",
-                        f"{WALL_OFFSET_OVER_TOP + di:.2f}"])
-    print(t("Top-reference offsets saved to {path}").format(
-        path=csv_3slope_top,
-    ))
+        # 3-slope (u, d) top-reference CSV.
+        u_arr = ramp.run - best3["x"]
+        d_arr = ramp.rise - best3["y"]
+        order = np.argsort(u_arr)
+        u_arr = u_arr[order]
+        d_arr = d_arr[order]
+        us_top = np.linspace(0.0, u_arr[-1], 28)
+        ds_top = np.interp(us_top, u_arr, d_arr)
+        csv_3slope_top = _output_name("csv_3slope_top", ".csv")
+        with open(csv_3slope_top, "w", newline="") as f:
+            w = csv.writer(f)
+            w.writerow([
+                "u_cm_from_top_edge",
+                "d_cm_below_top_plane",
+                "drop_cm_from_wall",
+            ])
+            for ui, di in zip(us_top, ds_top):
+                w.writerow([f"{ui:.2f}", f"{di:.2f}",
+                            f"{WALL_OFFSET_OVER_TOP + di:.2f}"])
+        print(t("Top-reference offsets saved to {path}").format(
+            path=csv_3slope_top,
+        ))
 
-    # Print key points of the 3-slope ramp to the terminal.
-    print()
-    print(t("Three-slope key points (mark these on the ground):"))
-    pt_label_w = 42
-    print(f"  {t('  pt'):<3} {t('what'):<{pt_label_w}} "
-          f"{t('x (cm)'):>8} {t('y (cm)'):>8}  {t('notes')}")
-    for i, (name, xi, yi, kind, r) in enumerate(
-        three_slope_keypoints(ramp, best3["x1"], best3["y1"],
-                              best3["x2"], best3["y2"], best3["fillet"])
-    ):
-        letter = "ABCDEFGHIJKLMN"[i]
-        notes = (t("corner") if kind == "kink"
-                 else t("fillet (R={r:.0f} cm)").format(r=r))
-        print(f"  {letter:<3} {name:<{pt_label_w}} {xi:8.1f} {yi:8.1f}  {notes}")
-    print()
+        # Print key points of the 3-slope ramp to the terminal.
+        print()
+        print(t("Three-slope key points (mark these on the ground):"))
+        pt_label_w = 42
+        print(f"  {t('  pt'):<3} {t('what'):<{pt_label_w}} "
+              f"{t('x (cm)'):>8} {t('y (cm)'):>8}  {t('notes')}")
+        for i, (name, xi, yi, kind, r) in enumerate(
+            three_slope_keypoints(ramp, best3["x1"], best3["y1"],
+                                  best3["x2"], best3["y2"], best3["fillet"])
+        ):
+            letter = "ABCDEFGHIJKLMN"[i]
+            notes = (t("corner") if kind == "kink"
+                     else t("fillet (R={r:.0f} cm)").format(r=r))
+            print(f"  {letter:<3} {name:<{pt_label_w}} "
+                  f"{xi:8.1f} {yi:8.1f}  {notes}")
+        print()
 
     # ---- Sensitivity if the ramp is lengthened -------------------------- #
-    if best["score"] < -0.1:
+    if best is not None and best["score"] < -0.1:
         print("\n" + t("The current run length leaves some unavoidable "
                         "scraping."))
         print(t("Sensitivity if the ramp is lengthened (rise stays at "
@@ -3396,15 +3455,21 @@ def compute_and_save(
         profiles = [
             (t("Linear ramp (current geometry)"),
              x_lin, y_lin, "tab:red", res_lin, []),
-            (t("Two arcs + straight"),
-             best["x"], best["y"], "tab:blue", best,
-             [(best["x_b_end"], best["y_b_end"]),
-              (best["x_m_end"], best["y_m_end"])]),
-            (t("Three slopes"),
-             best3["x"], best3["y"], "tab:green", best3,
-             [(best3["x1"], best3["y1"]),
-              (best3["x2"], best3["y2"])]),
         ]
+        if best is not None:
+            profiles.append((
+                t("Two arcs + straight"),
+                best["x"], best["y"], "tab:blue", best,
+                [(best["x_b_end"], best["y_b_end"]),
+                 (best["x_m_end"], best["y_m_end"])],
+            ))
+        if best3 is not None:
+            profiles.append((
+                t("Three slopes"),
+                best3["x"], best3["y"], "tab:green", best3,
+                [(best3["x1"], best3["y1"]),
+                 (best3["x2"], best3["y2"])],
+            ))
         if best4 is not None:
             profiles.append((
                 t("Four slopes"),
