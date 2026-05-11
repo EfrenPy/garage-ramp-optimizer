@@ -143,6 +143,32 @@ logic.  Doing it incrementally — one file at a time, with the test
 suite covering the public surface after each move — would be a
 welcome contribution.
 
+### SignPath Foundation code-signing — pending approval
+
+An application for free Authenticode signing through
+[SignPath Foundation](https://signpath.org/) was submitted on
+2026-05-11.  The CI pipeline changes that activate signing live
+on the `signpath/wire-up` branch and are deliberately **not
+merged to `main` yet** — they reference a placeholder
+Organisation UUID and would fail every release until the real
+values from SignPath arrive.
+
+When the approval email lands, follow the post-approval
+flip-the-switch checklist in
+[`docs/SIGNPATH.md`](docs/SIGNPATH.md):
+
+1. Store the SignPath CI API token as the `SIGNPATH_API_TOKEN`
+   repo secret.
+2. Replace the two TODO placeholders on `signpath/wire-up`.
+3. Open a PR from `signpath/wire-up` to `main` titled
+   `ci: enable SignPath code-signing on release`.
+4. Smoke-test with a `vX.Y.Z-rc1` tag (the pipeline auto-routes
+   pre-release tags to the `test-signing` policy).
+5. Merge the PR; subsequent stable tags ship signed.
+
+Until then, the binaries attached to GitHub Releases remain
+**unsigned** and trigger SmartScreen on first launch.
+
 ## Code of conduct
 
 Be kind. Assume good faith.  This is a hobby project — discussion

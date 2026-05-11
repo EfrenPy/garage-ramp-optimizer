@@ -55,6 +55,20 @@ interpreter and every dependency inside the `.exe`, so there is no
    The resulting binary weighs ~80–120 MB because it ships Python,
    numpy, scipy, matplotlib and Tk inside.
 
+   > **Optional — reduce antivirus false positives**: pass
+   > `--rebuild-bootloader` to reinstall PyInstaller from source so
+   > the bootloader is compiled locally with your toolchain (instead
+   > of using the prebuilt one that ships on PyPI, which many AVs
+   > flag by hash):
+   >
+   >     python build_exe.py --rebuild-bootloader
+   >     python build_exe.py --spanish --rebuild-bootloader
+   >
+   > Requires a C compiler on PATH — Visual Studio Build Tools on
+   > Windows (free), `gcc` / `clang` elsewhere.  The official CI
+   > release builds already use this flag.  Adds ~1-2 min to the
+   > build.
+
 ## 3. Use the executable
 
 ### GUI mode (recommended)
@@ -161,6 +175,29 @@ A pristine, never-seen-before `.exe` triggers reputation-based
 warnings ("SmartScreen prevented an unrecognized app from
 starting...") in Windows.  Signing the binary with a code-signing
 certificate makes that warning go away.
+
+### Option 0 — SignPath Foundation (this project's planned path)
+
+For releases produced by **this repo's CI** (not local builds),
+the long-term plan is **sponsored Authenticode signing via
+[SignPath Foundation](https://signpath.org/)** — free for
+qualifying open-source projects, no certificate purchase, no
+hardware token.  The application was submitted on 2026-05-11;
+once approved, every `rampa-*.exe` attached to a GitHub Release
+will ship pre-signed.  **Local builds done by following this
+guide remain unsigned** — the CI signing only applies to the
+binaries the maintainer attaches to a GitHub Release.
+
+Background, application checklist and the post-approval
+flip-the-switch steps are in
+[`docs/SIGNPATH.md`](docs/SIGNPATH.md).  The CI wiring is
+pre-staged on the `signpath/wire-up` branch and is **not** merged
+to `main` yet.
+
+End-users who want to verify the signature on a CI-released
+`.exe` once signing is live: see the
+[Verifying the Windows signature](README.md#verifying-the-windows-signature)
+section of the README.
 
 ### Option A — paid certificate (proper fix)
 
