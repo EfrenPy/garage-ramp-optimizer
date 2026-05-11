@@ -6,6 +6,13 @@ The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this
 project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.2](https://github.com/EfrenPy/garage-ramp-optimizer/compare/v0.7.1...v0.7.2) (2026-05-11)
+
+
+### Miscellaneous Chores
+
+* ship dependabot CI action bumps (v0.7.2) ([7c69d3e](https://github.com/EfrenPy/garage-ramp-optimizer/commit/7c69d3ec3c71f221ef736e0ca2b92b9b73dbad34))
+
 ## [0.7.1](https://github.com/EfrenPy/garage-ramp-optimizer/compare/v0.7.0...v0.7.1) (2026-05-09)
 
 
