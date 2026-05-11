@@ -10,7 +10,7 @@ numpy>=1.20
 # the v0.7.x development thread for measurements.  Bump the upper bound
 # only after re-running ``tests/test_search_determinism.py`` and a manual
 # comparison against the v0.4.1 baseline result.
-scipy>=1.10,<1.12
+scipy>=1.10,<1.16
 
 matplotlib>=3.5
 
