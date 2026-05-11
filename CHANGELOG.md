@@ -6,6 +6,14 @@ The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this
 project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.3](https://github.com/EfrenPy/garage-ramp-optimizer/compare/v0.7.2...v0.7.3) (2026-05-11)
+
+
+### Documentation
+
+* add Windows signature-verification section to README ([9cb366f](https://github.com/EfrenPy/garage-ramp-optimizer/commit/9cb366f995fd5fb0c9be788f7f6f6723ff24f18a))
+* capture SignPath workstream and project context in local docs ([770a186](https://github.com/EfrenPy/garage-ramp-optimizer/commit/770a186246959c80053d9c4a3880981a81d8b87c))
+
 ## [0.7.2](https://github.com/EfrenPy/garage-ramp-optimizer/compare/v0.7.1...v0.7.2) (2026-05-11)
 
 
