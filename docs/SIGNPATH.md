@@ -111,6 +111,49 @@ Once those four IDs are in hand, do the following on `main`:
    SignPath portal lets you inspect each request before signing,
    so a few rejected dry runs cost nothing.
 
+## Post-approval flip-the-switch checklist
+
+The CI changes described above are pre-staged on the
+`signpath/wire-up` branch.  When SignPath sends the approval email,
+follow these exact steps to flip the switch:
+
+1. **Open the email** from SignPath -- it contains four values:
+   the Organisation ID (UUID), the Project Slug, the Signing-Policy
+   Slug, and the CI user API token.  The token is shown **once**;
+   copy it into a password manager immediately.
+2. **Add the GitHub secret**:
+   - Repo Settings -> Secrets and variables -> Actions -> New
+     repository secret.
+   - Name: `SIGNPATH_API_TOKEN`
+   - Value: the token from the email.
+3. **Replace the three TODO placeholders** in
+   `.github/workflows/release.yml` on the `signpath/wire-up` branch:
+   - `organization-id:      00000000-0000-0000-0000-000000000000`
+     -> the Organisation UUID.
+   - `project-slug:         garage-ramp-optimizer`
+     -> verify this matches the slug SignPath assigned (usually it
+     does, but pick whatever they emailed).
+   - `signing-policy-slug:  release-signing`
+     -> the signing-policy slug they created.
+4. **Open a PR** from `signpath/wire-up` to `main` titled
+   `ci: enable SignPath code-signing on release` and merge it once
+   green.
+5. **Cut a release-candidate tag** -- e.g. `v0.7.3-rc1` -- via
+   `workflow_dispatch` on `release.yml`.  The SignPath portal will
+   show the submission and (depending on your project policy) may
+   require manual approval before signing.  Approve it once, watch
+   the workflow turn green, and verify with `signtool verify /pa
+   /v rampa-en.exe` (or right-click -> Properties -> Digital
+   Signatures) that the signed `.exe` lands on the rc release.
+6. **Cut the real release** the normal way (let release-please merge
+   its PR).  Both `rampa-en.exe` and `rampa-es.exe` should now ship
+   signed.
+
+If anything goes wrong, the build/sign/publish jobs each produce
+self-contained logs in the Actions tab.  The most common failure
+mode is a typo in the Organisation UUID -- the SignPath action
+returns a clear 401 in that case.
+
 ## Things to watch out for
 
 - **Reproducible builds**.  SignPath enforces that the binary they

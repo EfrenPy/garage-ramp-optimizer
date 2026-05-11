@@ -88,16 +88,80 @@ jobs:
           path: ${{ matrix.outname }}
           if-no-files-found: error
           # The artifacts only need to live long enough for the
-          # publish-release job in the same workflow run to pick them up
-          # and attach them to the GitHub Release.  We delete them
-          # explicitly at the end of publish-release; the 1-day
-          # retention is just a fallback if the run aborts mid-way.
+          # sign-windows-exe / publish-release jobs in the same workflow
+          # run to pick them up and attach them to the GitHub Release.
+          # We delete them explicitly at the end of publish-release; the
+          # 1-day retention is just a fallback if the run aborts mid-way.
+          retention-days: 1
+          compression-level: 9
+
+  # ---------------------------------------------------------------------
+  # SignPath Foundation code-signing.  Inserted between build and
+  # publish so the binaries attached to the GitHub Release are signed
+  # with the SignPath Authenticode certificate -- removing the
+  # "Windows protected your PC" SmartScreen overlay.
+  #
+  # Application + approval steps are documented in docs/SIGNPATH.md.
+  # Three things must be true before this job will work:
+  #   1.  SignPath has approved the project and emailed the maintainer
+  #       with the Organisation ID, Project Slug and Signing-Policy Slug.
+  #   2.  A repository secret named `SIGNPATH_API_TOKEN` exists with the
+  #       CI user API token from the same email.
+  #   3.  The TODO placeholders below have been replaced with the real
+  #       values.
+  #
+  # Until those three items are in place, this job will fail; that is
+  # intentional -- the staged branch (`signpath/wire-up`) is *not*
+  # supposed to be merged to `main` before SignPath approves.
+  # ---------------------------------------------------------------------
+  sign-windows-exe:
+    name: Sign Windows .exe (${{ matrix.outname }})
+    needs: build-windows-exe
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write       # required by SignPath's GitHub OIDC trust
+    strategy:
+      fail-fast: false
+      matrix:
+        outname: [rampa-en.exe, rampa-es.exe]
+    steps:
+      - name: Download unsigned build artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ matrix.outname }}
+          path: unsigned
+
+      - name: Submit signing request to SignPath
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token:            ${{ secrets.SIGNPATH_API_TOKEN }}
+          # TODO(signpath): replace with the Organisation ID emailed by
+          # SignPath after approval (UUID, e.g. abc12345-6789-...).
+          organization-id:      00000000-0000-0000-0000-000000000000
+          # TODO(signpath): replace with the project slug SignPath
+          # assigned to this project (typically `garage-ramp-optimizer`).
+          project-slug:         garage-ramp-optimizer
+          # TODO(signpath): replace with the signing-policy slug
+          # SignPath created (typically `release-signing`; some orgs
+          # ship `test-signing` for pre-release tags too).
+          signing-policy-slug:  release-signing
+          github-artifact-name: ${{ matrix.outname }}
+          wait-for-completion:  true
+          output-artifact-directory: signed
+
+      - name: Upload signed artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.outname }}-signed
+          path: signed/${{ matrix.outname }}
+          if-no-files-found: error
           retention-days: 1
           compression-level: 9
 
   publish-release:
     name: Publish GitHub Release
-    needs: build-windows-exe
+    needs: sign-windows-exe
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -114,11 +178,34 @@ jobs:
         with:
           ref: ${{ steps.tag.outputs.value }}
 
-      - name: Download all build artifacts
+      - name: Download signed artifacts
         uses: actions/download-artifact@v8
         with:
-          path: artifacts
-          merge-multiple: true
+          # Only the SignPath-signed copies should land on the Release.
+          # The raw `rampa-*.exe` artifacts from build-windows-exe are
+          # deliberately ignored here -- they exist purely as the input
+          # to sign-windows-exe.
+          pattern: "*.exe-signed"
+          path: signed-artifacts
+          merge-multiple: false
+
+      - name: Flatten signed artifacts into release-ready files
+        # The signed artifacts arrive as `signed-artifacts/<name>-signed/<name>`.
+        # softprops/action-gh-release wants flat paths, so move each
+        # signed .exe up to `artifacts/<name>` -- the same final layout
+        # we used pre-signing, keeping the release notes unchanged.
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          for outname in rampa-en.exe rampa-es.exe; do
+            src="signed-artifacts/${outname}-signed/${outname}"
+            if [[ ! -f "$src" ]]; then
+              echo "ERROR: expected signed artifact missing: $src" >&2
+              ls -R signed-artifacts/ >&2 || true
+              exit 1
+            fi
+            cp -v "$src" "artifacts/${outname}"
+          done
 
       - name: List collected files
         run: ls -la artifacts/
@@ -156,12 +243,24 @@ jobs:
             [`COMPILAR.md`](https://github.com/EfrenPy/garage-ramp-optimizer/blob/main/COMPILAR.md)
             if you want to build the executable yourself.
 
+            ### Code signature
+
+            Both executables are code-signed by
+            [SignPath Foundation](https://signpath.org/) on every
+            release.  Right-click the `.exe` ▸ Properties ▸
+            **Digital Signatures** to inspect the certificate chain
+            (issuer: *SignPath Foundation*, signed subject:
+            *garage-ramp-optimizer*).  See
+            [`README.md` ▸ Verifying the Windows signature](https://github.com/EfrenPy/garage-ramp-optimizer#verifying-the-windows-signature)
+            for the full check.
+
             ### Antivirus note
 
-            Some antiviruses flag any uncommon `.exe` by reputation.
-            Workarounds: add the file to your antivirus' exclusion
-            list, or run the Python script directly without
-            compiling — see [`CONTRIBUTING.md`](https://github.com/EfrenPy/garage-ramp-optimizer/blob/main/CONTRIBUTING.md).
+            Some antiviruses flag any uncommon `.exe` by reputation,
+            even after signing.  Workarounds: add the file to your
+            antivirus' exclusion list, or run the Python script
+            directly without compiling — see
+            [`CONTRIBUTING.md`](https://github.com/EfrenPy/garage-ramp-optimizer/blob/main/CONTRIBUTING.md).
 
       - name: Delete intermediate workflow artifacts
         # The .exe files now live on the GitHub Release itself, so the
