@@ -126,28 +126,42 @@ follow these exact steps to flip the switch:
      repository secret.
    - Name: `SIGNPATH_API_TOKEN`
    - Value: the token from the email.
-3. **Replace the three TODO placeholders** in
+3. **Replace the two TODO placeholders** in
    `.github/workflows/release.yml` on the `signpath/wire-up` branch:
    - `organization-id:      00000000-0000-0000-0000-000000000000`
      -> the Organisation UUID.
    - `project-slug:         garage-ramp-optimizer`
      -> verify this matches the slug SignPath assigned (usually it
      does, but pick whatever they emailed).
-   - `signing-policy-slug:  release-signing`
-     -> the signing-policy slug they created.
-4. **Open a PR** from `signpath/wire-up` to `main` titled
+
+   The signing-policy slug is **resolved at runtime** from the tag
+   shape (see the "Resolve target tag and signing policy" step):
+   - stable tags `vX.Y.Z` -> `release-signing`
+   - pre-release tags `-rc/-alpha/-beta/-pre` -> `test-signing`
+
+   If SignPath only ships *one* policy for this project, edit that
+   resolve-step to point both branches at the same slug, or rename
+   the slug in the resolve-step to whatever they actually created.
+4. **(Recommended) reply to the SignPath approval email** asking
+   them to create **two** signing policies: `release-signing` (with
+   manual approval per submission, gated by the maintainer) and
+   `test-signing` (auto-approved, restricted to tags matching
+   `v*-(rc|alpha|beta|pre)*`).  That mirrors what the CI now
+   expects and lets rc tags smoke-test the pipeline without
+   maintainer paging.  If they refuse, fall back to a single
+   policy per the previous step.
+5. **Open a PR** from `signpath/wire-up` to `main` titled
    `ci: enable SignPath code-signing on release` and merge it once
    green.
-5. **Cut a release-candidate tag** -- e.g. `v0.7.3-rc1` -- via
-   `workflow_dispatch` on `release.yml`.  The SignPath portal will
-   show the submission and (depending on your project policy) may
-   require manual approval before signing.  Approve it once, watch
-   the workflow turn green, and verify with `signtool verify /pa
-   /v rampa-en.exe` (or right-click -> Properties -> Digital
-   Signatures) that the signed `.exe` lands on the rc release.
-6. **Cut the real release** the normal way (let release-please merge
+6. **Cut a release-candidate tag** -- e.g. `v0.7.3-rc1` -- via
+   `workflow_dispatch` on `release.yml`.  The pipeline will route
+   it to the `test-signing` policy automatically.  Verify with
+   `signtool verify /pa /v rampa-en.exe` (or right-click ->
+   Properties -> Digital Signatures) that the signed `.exe` lands
+   on the rc release.
+7. **Cut the real release** the normal way (let release-please merge
    its PR).  Both `rampa-en.exe` and `rampa-es.exe` should now ship
-   signed.
+   signed under `release-signing`.
 
 If anything goes wrong, the build/sign/publish jobs each produce
 self-contained logs in the Actions tab.  The most common failure
@@ -156,11 +170,18 @@ returns a clear 401 in that case.
 
 ## Things to watch out for
 
-- **Reproducible builds**.  SignPath enforces that the binary they
-  sign was produced by the same workflow that submitted it.  Our
-  PyInstaller bootloader is non-deterministic by default; consider
-  the `--rebuild-bootloader` path documented in `build_exe.py` once
-  the bootloader rebuild is part of the standard CI image.
+- **Reproducible-ish builds**.  SignPath verifies via GitHub OIDC
+  that the binary they sign was produced by the same workflow run
+  that submitted it; the workflow stays self-contained
+  (`build -> sign -> publish` in one run) so this is satisfied
+  automatically.  On top of that, `release.yml` passes
+  `--rebuild-bootloader` to `build_exe.py` so the PyInstaller
+  bootloader is compiled locally from source on `windows-latest`
+  instead of using the prebuilt PyPI bootloader -- this gives
+  every release a unique bootloader hash, accelerating SmartScreen
+  reputation accumulation against our SignPath certificate and
+  dodging the bulk-AV heuristics that flag the off-the-shelf
+  PyInstaller bootloader.
 - **Reputation still has to build up**.  Even with a valid
   signature SmartScreen will warn for the first few thousand
   downloads.  Each new release inherits the certificate's

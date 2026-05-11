@@ -73,7 +73,22 @@ jobs:
           python -m pip install -r requirements.txt
 
       - name: Build executable (${{ matrix.label }})
-        run: python build_exe.py ${{ matrix.extra_args }}
+        # ``--rebuild-bootloader`` reinstalls PyInstaller from source so
+        # the bootloader binary that wraps the .exe is compiled locally
+        # against the GitHub-hosted MSVC Build Tools.  Two benefits:
+        #
+        #   1.  The resulting bootloader hash is unique to this repo,
+        #       so each new release page builds SmartScreen reputation
+        #       against our certificate independently from every other
+        #       PyInstaller user on the planet.
+        #   2.  It dodges the "this is the same prebuilt bootloader
+        #       half the world's malware authors also use" heuristic
+        #       that drives most antivirus false positives.
+        #
+        # Cost: ~1-2 min extra per matrix leg.  windows-latest already
+        # ships the MSVC Build Tools needed for the compile, so no
+        # extra setup-msvc step is required.
+        run: python build_exe.py ${{ matrix.extra_args }} --rebuild-bootloader
 
       - name: Rename and verify executable
         shell: pwsh
@@ -126,6 +141,34 @@ jobs:
       matrix:
         outname: [rampa-en.exe, rampa-es.exe]
     steps:
+      - name: Resolve target tag and signing policy
+        id: policy
+        shell: bash
+        # Pick which SignPath policy to submit against based on the
+        # tag shape:
+        #   * `vX.Y.Z` (clean semver)                 -> release-signing
+        #   * `vX.Y.Z-rc1`, `-alpha`, `-beta`, `-pre` -> test-signing
+        #
+        # Rationale: the `test-signing` policy is configured at SignPath
+        # to skip manual approval and trust the same OIDC chain, so
+        # release candidates can be smoke-tested without paging the
+        # maintainer.  The strict `release-signing` policy may require
+        # manual approval per-submission (configurable per-project) and
+        # is reserved for stable tags.  If only one policy ends up
+        # configured at SignPath, point both branches at it -- see the
+        # post-approval checklist in docs/SIGNPATH.md.
+        run: |
+          set -euo pipefail
+          TAG="${{ inputs.tag || github.event.inputs.tag || github.ref_name }}"
+          if [[ "$TAG" =~ -(rc|alpha|beta|pre)([.-]?[0-9]+)?$ ]]; then
+            POLICY=test-signing
+          else
+            POLICY=release-signing
+          fi
+          echo "tag=$TAG"       >> "$GITHUB_OUTPUT"
+          echo "policy=$POLICY" >> "$GITHUB_OUTPUT"
+          echo "Tag: $TAG  ->  signing policy: $POLICY"
+
       - name: Download unsigned build artifact
         uses: actions/download-artifact@v8
         with:
@@ -142,10 +185,12 @@ jobs:
           # TODO(signpath): replace with the project slug SignPath
           # assigned to this project (typically `garage-ramp-optimizer`).
           project-slug:         garage-ramp-optimizer
-          # TODO(signpath): replace with the signing-policy slug
-          # SignPath created (typically `release-signing`; some orgs
-          # ship `test-signing` for pre-release tags too).
-          signing-policy-slug:  release-signing
+          # Signing policy is resolved dynamically from the tag shape
+          # (see the "Resolve target tag and signing policy" step
+          # above).  If SignPath only ships one policy for this
+          # project, change *both* branches in that step to point at
+          # the same slug.
+          signing-policy-slug:  ${{ steps.policy.outputs.policy }}
           github-artifact-name: ${{ matrix.outname }}
           wait-for-completion:  true
           output-artifact-directory: signed
