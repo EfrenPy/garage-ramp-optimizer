@@ -187,6 +187,54 @@ Parameters:
 | `-r` / `--voladizo-trasero` / `--rear-overhang` | rear overhang (cm) | 0 |
 | `--lang` | UI language (`en` / `es`) | `en` |
 
+## Verifying the Windows signature
+
+Releases from a future version onward (once
+[SignPath Foundation](https://signpath.org/) approves the
+project — see [`docs/SIGNPATH.md`](docs/SIGNPATH.md)) ship
+**Authenticode-signed** `rampa-en.exe` / `rampa-es.exe`.  You can
+confirm the signature in three ways; pick whichever you prefer:
+
+**GUI (no tools required).**  Right-click the downloaded `.exe`
+▸ **Properties** ▸ **Digital Signatures** tab.  You should see one
+signature with:
+
+- **Name of signer**: `SignPath Foundation`
+- **Digest algorithm**: `sha256`
+- A countersignature timestamp from a public TSA.
+
+Double-click the signature row ▸ **View Certificate** ▸
+**Certification Path** to confirm the chain terminates at a root
+that Windows already trusts (`Sectigo` or `DigiCert`, depending on
+the SignPath sub-CA in force at the time of release).
+
+**PowerShell (one-liner).**
+
+```powershell
+Get-AuthenticodeSignature .\rampa-en.exe | Format-List Status, SignerCertificate, TimeStamperCertificate
+```
+
+`Status` should be `Valid`.  If you see `NotSigned`, you either
+downloaded a pre-signing release or the file was tampered with
+in transit — re-download from the official
+[Releases page](https://github.com/EfrenPy/garage-ramp-optimizer/releases/latest).
+
+**`signtool` (Windows SDK).**
+
+```cmd
+signtool verify /pa /v rampa-en.exe
+```
+
+The verbose flag prints the full chain and the timestamp authority.
+
+**Until SignPath approves**, the executables remain **unsigned** and
+SmartScreen will warn the first time you launch them.  The "Antivirus
+note" paragraph at the bottom of every
+[Release page](https://github.com/EfrenPy/garage-ramp-optimizer/releases/latest)
+explains the click-through; in short: SmartScreen ▸ *More info* ▸
+*Run anyway*, or right-click the file ▸ Properties ▸ tick *Unblock*
+▸ OK.
+
 ## Repository layout
 
 ```
