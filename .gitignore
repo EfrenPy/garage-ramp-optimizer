@@ -39,3 +39,10 @@ venv/
 .DS_Store
 Thumbs.db
 *.swp
+
+# Claude Code workspace state and project-local memory file.
+# CLAUDE.md is intentionally kept out of the public repo -- it is a
+# Claude-specific orientation guide for the maintainer, not part of
+# the project documentation users / contributors need.
+.claude/
+CLAUDE.md
