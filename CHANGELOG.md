@@ -6,6 +6,19 @@ The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this
 project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.3](https://github.com/EfrenPy/garage-ramp-optimizer/compare/v0.7.2...v0.7.3) (2026-07-13)
+
+
+### Bug Fixes
+
+* correctness, i18n and reliability fixes, module split, CI hardening ([#24](https://github.com/EfrenPy/garage-ramp-optimizer/issues/24)) ([219765c](https://github.com/EfrenPy/garage-ramp-optimizer/commit/219765cf79519cb8332d2595300ace9033f49aeb))
+
+
+### Documentation
+
+* add Windows signature-verification section to README ([9cb366f](https://github.com/EfrenPy/garage-ramp-optimizer/commit/9cb366f995fd5fb0c9be788f7f6f6723ff24f18a))
+* capture SignPath workstream and project context in local docs ([0bfd8d3](https://github.com/EfrenPy/garage-ramp-optimizer/commit/0bfd8d3f477dc042c1faa62155982f289cb258fa))
+
 ## [0.7.2](https://github.com/EfrenPy/garage-ramp-optimizer/compare/v0.7.1...v0.7.2) (2026-05-11)
 
 
