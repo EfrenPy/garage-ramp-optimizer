@@ -120,7 +120,13 @@ ignore = [
 # Start lenient: report obvious issues, do not block CI on the
 # every-untyped-import noise that scientific stacks tend to produce.
 python_version = "3.10"
-files = ["ramp_optimizer.py"]
+files = [
+    "ramp_env.py",
+    "ramp_model.py",
+    "ramp_profiles.py",
+    "ramp_search.py",
+    "ramp_optimizer.py",
+]
 ignore_missing_imports = true
 follow_imports = "silent"
 warn_unused_ignores = true

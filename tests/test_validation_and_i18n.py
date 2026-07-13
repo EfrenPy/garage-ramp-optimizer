@@ -73,6 +73,19 @@ def test_translations_keep_placeholder_sets():
 # --------------------------------------------------------------------- #
 #  matplotlib figure lifecycle
 # --------------------------------------------------------------------- #
+def test_sensitivity_preserves_run_order():
+    """The candidate runs are optimised in parallel; the returned rows
+    must still line up with the input ``runs`` order."""
+    car = ro.Car(clearance=14.0, wheelbase=269.0,
+                 front_overhang=87.0, rear_overhang=0.0)
+    ramp = ro.Ramp(rise=136.0, run=540.0)
+    runs = [540.0, 620.0]
+    rows = ro.sensitivity(car, ramp, runs)
+    assert [r[0] for r in rows] == runs
+    # A longer run can only help, so its worst score is >= the base run's.
+    assert rows[1][3] >= rows[0][3]
+
+
 def test_save_fig_closes_the_figure(monkeypatch):
     """_save_fig must release the figure so repeated GUI runs do not leak
     Figure objects into matplotlib's global registry."""

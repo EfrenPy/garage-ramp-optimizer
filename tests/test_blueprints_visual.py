@@ -73,14 +73,15 @@ def test_chord_blueprint_4slope(matplotlib_pyplot, tmp_path):
     breaks = [(80.0, 12.0), (200.0, 35.0), (320.0, 65.0)]
     x, y = ro.n_slope_profile(RAMP, breaks, fillet=0.0, n=600)
     out = tmp_path / "cord.png"
-    ro.draw_chord_blueprint(
+    # The draw function saves and closes its figure (so the long-lived GUI
+    # does not leak Figures); it returns that figure, whose artists survive
+    # the close, for pytest-mpl to compare.
+    return ro.draw_chord_blueprint(
         RAMP, x_curve=x, y_curve=y,
         label="4-slope ramp", color="tab:purple",
         breaks=breaks,
         path=str(out),
     )
-    # Re-open the saved figure as the figure pytest-mpl will compare.
-    return matplotlib_pyplot.gcf()
 
 
 @requires_pytest_mpl
@@ -94,7 +95,7 @@ def test_topref_blueprint_4slope(matplotlib_pyplot, tmp_path):
     breaks = [(80.0, 12.0), (200.0, 35.0), (320.0, 65.0)]
     x, y = ro.n_slope_profile(RAMP, breaks, fillet=0.0, n=600)
     out = tmp_path / "topref.png"
-    ro.draw_piecewise_blueprint_topref(
+    return ro.draw_piecewise_blueprint_topref(
         RAMP,
         breaks=breaks,
         x_curve=x, y_curve=y,
@@ -103,7 +104,6 @@ def test_topref_blueprint_4slope(matplotlib_pyplot, tmp_path):
         label="4-slope ramp",
         path=str(out),
     )
-    return matplotlib_pyplot.gcf()
 
 
 def test_blueprints_do_not_crash_without_baselines(tmp_path):

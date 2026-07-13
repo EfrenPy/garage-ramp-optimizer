@@ -115,7 +115,6 @@ import math
 import os
 import sys
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from dataclasses import dataclass
 
 import ramp_env  # noqa: F401  # pin BLAS threads before numpy
 
@@ -643,7 +642,7 @@ def draw_three_slope_blueprint_topref(
     )
 
     # Table.
-    ax_table = fig.add_axes([0.05, 0.03, 0.92, 0.26])
+    ax_table = fig.add_axes((0.05, 0.03, 0.92, 0.26))
     ax_table.set_axis_off()
     cell_text = []
     for letter, name, ui, di, kind, r in table_rows:
@@ -688,6 +687,7 @@ def draw_three_slope_blueprint_topref(
     pdf_path = _save_fig(fig, path)
     print(t("Construction blueprint (top reference) saved to {path} "
             "(+ PDF: {pdf})").format(path=path, pdf=pdf_path))
+    return fig
 
 
 def _draw_topref_chrome(
@@ -838,7 +838,7 @@ def _draw_topref_chrome(
 
 def _topref_table(fig, table_rows, n_cols: int = 5):
     """Place the measurements table at the bottom of the figure."""
-    ax_table = fig.add_axes([0.05, 0.03, 0.92, 0.26])
+    ax_table = fig.add_axes((0.05, 0.03, 0.92, 0.26))
     ax_table.set_axis_off()
     table = ax_table.table(
         cellText=[row[:n_cols] for row in table_rows[1:]],
@@ -1006,6 +1006,7 @@ def draw_piecewise_blueprint_topref(
     pdf_path = _save_fig(fig, path)
     print(t("Construction blueprint saved to {path} (+ PDF: {pdf})"
             ).format(path=path, pdf=pdf_path))
+    return fig
 
 
 def draw_smooth_blueprint_topref(
@@ -1134,7 +1135,7 @@ def draw_smooth_blueprint_topref(
     # blueprints that still use the helper.
     col_labels = list(table_rows[0])
     rows = list(table_rows[1:])
-    ax_table = fig.add_axes([0.05, 0.02, 0.92, 0.36])
+    ax_table = fig.add_axes((0.05, 0.02, 0.92, 0.36))
     ax_table.set_axis_off()
     table = ax_table.table(
         cellText=rows, colLabels=col_labels,
@@ -1166,6 +1167,7 @@ def draw_smooth_blueprint_topref(
     pdf_path = _save_fig(fig, path)
     print(t("Construction blueprint saved to {path} (+ PDF: {pdf})"
             ).format(path=path, pdf=pdf_path))
+    return fig
 
 
 def chord_coords(ramp: Ramp, x_arr, y_arr):
@@ -1374,7 +1376,7 @@ def draw_smooth_blueprint_groundref(
             kind = t("intermediate station")
         rows.append((str(n), f"{xi:7.1f}", f"{yi:7.1f}", kind))
 
-    ax_table = fig.add_axes([0.05, 0.02, 0.92, 0.36])
+    ax_table = fig.add_axes((0.05, 0.02, 0.92, 0.36))
     ax_table.set_axis_off()
     table = ax_table.table(
         cellText=rows, colLabels=col_labels,
@@ -1397,6 +1399,7 @@ def draw_smooth_blueprint_groundref(
     pdf_path = _save_fig(fig, path)
     print(t("Construction blueprint saved to {path} (+ PDF: {pdf})"
             ).format(path=path, pdf=pdf_path))
+    return fig
 
 
 def draw_chord_blueprint(
@@ -1671,7 +1674,7 @@ def draw_chord_blueprint(
     # Bottom: measurements table, placed well below the working drawing
     # (the gridspec ends at y=0.42, so the table fits in the lower 36%
     # of the figure without overlapping the plot area).
-    ax_table = fig.add_axes([0.05, 0.02, 0.92, 0.36])
+    ax_table = fig.add_axes((0.05, 0.02, 0.92, 0.36))
     ax_table.set_axis_off()
     if is_smooth:
         col_labels = [
@@ -1735,6 +1738,7 @@ def draw_chord_blueprint(
     pdf_path = _save_fig(fig, path)
     print(t("Construction blueprint (cord reference) saved to {path} "
             "(+ PDF: {pdf})").format(path=path, pdf=pdf_path))
+    return fig
 
 
 def draw_three_slope_blueprint(ramp: Ramp, best3: dict, path: str = "ramp_blueprint.png"):
@@ -1911,7 +1915,7 @@ def draw_three_slope_blueprint(ramp: Ramp, best3: dict, path: str = "ramp_bluepr
     )
 
     # ----  Measurements table in its own axes below the drawing.  ---- #
-    ax_table = fig.add_axes([0.05, 0.03, 0.92, 0.26])
+    ax_table = fig.add_axes((0.05, 0.03, 0.92, 0.26))
     ax_table.set_axis_off()
     cell_text = []
     for letter, name, xi, yi, kind, r in table_rows:
@@ -1945,6 +1949,7 @@ def draw_three_slope_blueprint(ramp: Ramp, best3: dict, path: str = "ramp_bluepr
     pdf_path = _save_fig(fig, path)
     print(t("Construction blueprint saved to {path} (+ PDF: {pdf})"
             ).format(path=path, pdf=pdf_path))
+    return fig
 
 
 def write_offsets(path, x, y, n=28):
@@ -2009,22 +2014,42 @@ def fmt_currency(value: float, symbol: str = "EUR") -> str:
 def sensitivity(car: Car, base_ramp: Ramp, runs):
     """For a list of candidate runs, optimise the ramp and report the
     worst-case clearance.  Useful when you can extend the slope into
-    the garage or street area."""
-    rows = []
-    for run in runs:
-        ramp = Ramp(rise=base_ramp.rise, run=run)
-        try:
-            best = search(ramp, car, n_theta=18, n_frac=18, refine=7)
-            rows.append((run, best["chassis_min"], best["overhang_min"],
-                         best["score"]))
-        except Exception as e:  # pragma: no cover  # noqa: BLE001
-            # Surface why a candidate run failed instead of leaving a
-            # silent NaN row — a bare NaN hides both bad geometry and
-            # genuine regressions (e.g. a scipy behaviour change).
-            print(t("  (sensitivity: run {run:.0f} cm failed: {err})").format(
-                run=run, err=e), file=sys.stderr)
-            rows.append((run, float("nan"), float("nan"), float("nan")))
-    return rows
+    the garage or street area.
+
+    The candidate runs are independent searches, so they run in parallel
+    across processes; results are returned in the original ``runs`` order.
+    """
+    runs = list(runs)
+    if not runs:
+        return []
+
+    def _nan_row(run, err):
+        # Surface why a candidate run failed instead of leaving a silent
+        # NaN row — a bare NaN hides both bad geometry and genuine
+        # regressions (e.g. a scipy behaviour change).
+        print(t("  (sensitivity: run {run:.0f} cm failed: {err})").format(
+            run=run, err=err), file=sys.stderr)
+        return (run, float("nan"), float("nan"), float("nan"))
+
+    results: dict = {}
+    max_workers = min(len(runs), os.cpu_count() or 1)
+    with ProcessPoolExecutor(max_workers=max_workers) as pool:
+        fut_to_idx = {
+            pool.submit(search, Ramp(rise=base_ramp.rise, run=run), car,
+                        n_theta=18, n_frac=18, refine=7): i
+            for i, run in enumerate(runs)
+        }
+        for fut in as_completed(fut_to_idx):
+            i = fut_to_idx[fut]
+            run = runs[i]
+            try:
+                best = fut.result()
+                results[i] = (run, best["chassis_min"],
+                              best["overhang_min"], best["score"])
+            except Exception as e:  # pragma: no cover  # noqa: BLE001
+                results[i] = _nan_row(run, e)
+
+    return [results[i] for i in range(len(runs))]
 
 
 def _ask_float(prompt: str, default: float | None = None,
@@ -2350,7 +2375,10 @@ def compute_and_save(
     # flags let the caller skip an entire profile -- handy when, for
     # instance, the 3-slope geometry consistently scores worse than
     # the 4-slope on the user's specific ramp dimensions.
-    parallel_jobs = []
+    # Heterogeneous (key, search-fn, args) jobs; the search fns and their
+    # arg tuples differ in shape, so annotate loosely to keep mypy quiet.
+    from typing import Any, Callable
+    parallel_jobs: list[tuple[str, Callable[..., Any], tuple]] = []
     if enable_2arc:
         parallel_jobs.append(("arc", search, (ramp, car)))
     if enable_3slope:
@@ -2602,8 +2630,7 @@ def compute_and_save(
     print("\n" + t("Comparison summary (worst scrape, in cm; positive = "
                     "no scrape):"))
     head_perfil = "profile" if LANGUAGE == "en" else "perfil"
-    head_bajo = t("    bajo").lstrip().rjust(8) if LANGUAGE == "es" \
-        else "chassis".rjust(8)
+    head_bajo = ("bajo" if LANGUAGE == "es" else "chassis").rjust(8)
     head_bumper = "bumper".rjust(9)
     head_score = "worst".rjust(8)
     if LANGUAGE == "es":
@@ -2764,7 +2791,7 @@ def compute_and_save(
                 min_clr[i] = float(np.min(chassis_y - road_y))
             return rear_xs, min_clr
 
-        profiles = [
+        profiles: list = [
             (t("Linear ramp (current geometry)"),
              x_lin, y_lin, "tab:red", res_lin, []),
         ]
