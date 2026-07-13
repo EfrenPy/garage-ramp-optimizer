@@ -23,7 +23,7 @@ jobs:
       matrix:
         python-version: ["3.10", "3.11", "3.12"]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -41,7 +41,9 @@ jobs:
 
       - name: Syntax check
         run: |
-          python -m py_compile ramp_optimizer.py build_exe.py
+          python -m py_compile \
+            ramp_env.py ramp_model.py ramp_profiles.py ramp_search.py \
+            ramp_optimizer.py ramp_gui.py ramp_i18n.py build_exe.py
           if [ -d src ]; then
             python -m compileall -q src
           fi
@@ -49,13 +51,14 @@ jobs:
       - name: Import smoke test
         run: |
           python -c "import ramp_optimizer; print('imports OK')"
+          python -c "import ramp_gui; print('gui imports OK')"
 
       - name: Ruff lint
         run: ruff check .
 
       - name: mypy (advisory, not blocking)
         continue-on-error: true
-        run: mypy ramp_optimizer.py
+        run: mypy
 
       - name: Run tests with coverage
         run: |
@@ -68,9 +71,17 @@ jobs:
             echo "No tests directory yet, skipping."
           fi
 
+      - name: Visual-regression (advisory — baselines are platform-sensitive)
+        # Renders the blueprints and compares them pixel-wise against the
+        # committed baselines under tests/baseline_images/.  Advisory only:
+        # font/backend differences across matplotlib versions can exceed the
+        # tolerance without indicating a real regression.
+        continue-on-error: true
+        run: python -m pytest --mpl tests/test_blueprints_visual.py -q
+
       - name: Upload coverage to Codecov
         if: matrix.python-version == '3.11'
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         with:
           files: coverage.xml
           fail_ci_if_error: false

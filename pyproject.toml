@@ -68,10 +68,20 @@ Changelog = "https://github.com/EfrenPy/garage-ramp-optimizer/blob/main/CHANGELO
 [project.scripts]
 ramp-optimizer = "ramp_optimizer:main"
 
-# Tell setuptools that the project is a single top-level module
-# (ramp_optimizer.py), not a package.
+# The project is a set of flat top-level modules, not a package.
+# ramp_optimizer is the entry point; it imports the sibling modules
+# (geometry/profiles/searches were split out of the original monolith,
+# and ramp_gui/ramp_i18n/ramp_env round out the app).
 [tool.setuptools]
-py-modules = ["ramp_optimizer"]
+py-modules = [
+    "ramp_optimizer",
+    "ramp_env",
+    "ramp_model",
+    "ramp_profiles",
+    "ramp_search",
+    "ramp_i18n",
+    "ramp_gui",
+]
 
 # -------------------------------------------------------------------- #
 #  Tooling configuration
@@ -110,7 +120,13 @@ ignore = [
 # Start lenient: report obvious issues, do not block CI on the
 # every-untyped-import noise that scientific stacks tend to produce.
 python_version = "3.10"
-files = ["ramp_optimizer.py"]
+files = [
+    "ramp_env.py",
+    "ramp_model.py",
+    "ramp_profiles.py",
+    "ramp_search.py",
+    "ramp_optimizer.py",
+]
 ignore_missing_imports = true
 follow_imports = "silent"
 warn_unused_ignores = true

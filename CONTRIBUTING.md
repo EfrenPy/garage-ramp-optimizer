@@ -74,11 +74,28 @@ The result lands in `dist/rampa.exe` (Windows) or `dist/rampa`
   ```bash
   python -m ruff check .
   python -m pytest -q
-  python -m py_compile ramp_optimizer.py build_exe.py
+  python -m py_compile ramp_env.py ramp_model.py ramp_profiles.py \
+      ramp_search.py ramp_optimizer.py ramp_gui.py ramp_i18n.py build_exe.py
   ```
 
-  The same three checks run automatically on every push and pull
-  request via `.github/workflows/ci.yml`.
+  The same checks run automatically on every push and pull request via
+  `.github/workflows/ci.yml`.
+
+## Module layout
+
+The app is a set of flat top-level modules (not a package); `ramp_optimizer`
+imports the rest and re-exports their public names, so `ramp_optimizer.Car`,
+`ramp_optimizer.evaluate`, etc. keep working:
+
+| Module | Responsibility |
+|---|---|
+| `ramp_env.py` | Pin BLAS thread counts to 1 — **import before numpy** |
+| `ramp_model.py` | `Car` / `Ramp` value objects |
+| `ramp_profiles.py` | The profile-family generators (pure geometry) |
+| `ramp_search.py` | `evaluate()` + the `differential_evolution` searches |
+| `ramp_optimizer.py` | Blueprint drawing, CLI, `compute_and_save` orchestration |
+| `ramp_gui.py` | Tkinter front-end (`launch_gui`) |
+| `ramp_i18n.py` | `t()` and the `_TRANSLATIONS_ES` catalogue |
 
 ## Adding or changing user-visible strings
 
@@ -93,22 +110,25 @@ If you add or change a user-visible string:
    placeholders inside the translated string so both languages share
    the same `.format(...)` arguments.
 2. Add the Spanish translation as a new key/value in the
-   `_TRANSLATIONS_ES` dictionary at the top of `ramp_optimizer.py`.
-   Strings missing from the dictionary fall back to the English
-   original at runtime, so the program does not break, but the user
-   experience is mixed.
+   `_TRANSLATIONS_ES` dictionary in `ramp_i18n.py`.  Strings missing
+   from the dictionary fall back to the English original at runtime, so
+   the program does not break, but the user experience is mixed.
+   `tests/test_validation_and_i18n.py` checks that every translation
+   keeps the placeholder set of its English key.
 3. If your change affects the GUI progress bar, update the `STAGES`
    list inside `launch_gui()` so the trigger substrings still match
    the localised log output.
 
 ## Adding a new profile family
 
-The optimisation lives in `ramp_optimizer.py`.  To add a new family:
+Generators live in `ramp_profiles.py` and their searches in
+`ramp_search.py`.  To add a new family:
 
-1. Write a `your_profile(ramp, ...)` generator that returns
-   `(x_array, y_array)`.
-2. Write a `search_your_profile(ramp, car, ...)` that calls
-   `evaluate(...)` to score candidates and returns a `dict` shaped
+1. Write a `your_profile(ramp, ...)` generator in `ramp_profiles.py`
+   that returns `(x_array, y_array)`.
+2. Write a `search_your_profile(ramp, car, ...)` in `ramp_search.py`
+   that calls `evaluate(...)` to score candidates and returns a `dict`
+   shaped
    like the existing `best4` / `best_smooth` (must include
    `chassis_min`, `overhang_min`, `score`, `x`, `y`).
 3. Plug it into `compute_and_save(ramp, car)` and into the comparison
@@ -122,7 +142,7 @@ The optimisation lives in `ramp_optimizer.py`.  To add a new family:
 
 Before pressing "Create pull request":
 
-- [ ] `python -m py_compile ramp_optimizer.py build_exe.py` is clean.
+- [ ] `python -m py_compile ramp_*.py build_exe.py` is clean.
 - [ ] You ran `python ramp_optimizer.py 136 540` (or any other
       sensible inputs) end-to-end and verified the blueprints look
       right.
@@ -135,13 +155,16 @@ Before pressing "Create pull request":
 
 ## Recorded follow-ups
 
-The codebase is currently a single 3500-line module
-(`ramp_optimizer.py`).  A package split into something like
-`src/ramp_optimizer/{i18n,model,profiles,blueprints,gui,cli}.py`
-would make the file tree easier to navigate without changing the
-logic.  Doing it incrementally — one file at a time, with the test
-suite covering the public surface after each move — would be a
-welcome contribution.
+The geometry, profile generators and searches have been split out of
+`ramp_optimizer.py` into `ramp_model` / `ramp_profiles` / `ramp_search`
+(see **Module layout** above).  The remaining large piece is the
+**blueprint-drawing layer** (~1500 lines of matplotlib), still in
+`ramp_optimizer.py` because it is coupled to the module-level output
+toggles (`_OUTPUT_PDF/PNG/CSV`).  Moving it into a `ramp_blueprints`
+module — threading an explicit output-config object instead of the
+globals — would finish the split.  Do it incrementally, with the test
+suite (including the `--mpl` visual-regression checks) covering the
+public surface after each move.
 
 ### SignPath Foundation code-signing — pending approval
 

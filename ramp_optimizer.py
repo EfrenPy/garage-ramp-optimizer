@@ -115,24 +115,8 @@ import math
 import os
 import sys
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from dataclasses import dataclass
 
-# Pin numerical-library thread counts BEFORE importing numpy/scipy so the
-# optimiser is bit-for-bit reproducible across runs.  Multi-threaded BLAS
-# (OpenBLAS, MKL, Accelerate) re-orders floating-point summations between
-# threads, which can perturb differential_evolution's convergence path and
-# polish step enough to land on visibly different smooth-curve optima even
-# with a fixed seed.
-for _var in (
-    "OPENBLAS_NUM_THREADS",
-    "MKL_NUM_THREADS",
-    "OMP_NUM_THREADS",
-    "NUMEXPR_NUM_THREADS",
-    "VECLIB_MAXIMUM_THREADS",
-    "BLIS_NUM_THREADS",
-):
-    os.environ.setdefault(_var, "1")
-del _var
+import ramp_env  # noqa: F401  # pin BLAS threads before numpy
 
 import numpy as np
 
@@ -263,17 +247,24 @@ def _save_fig(fig, png_path: str, dpi: int = 130) -> str:
         pdf_path = pdf_path[:-4] + ".pdf"
     else:
         pdf_path = pdf_path + ".pdf"
-    if not _OUTPUT_PDF:
-        return ""
-    try:
-        fig.savefig(pdf_path)
-    except (ImportError, ModuleNotFoundError, ValueError) as exc:
-        # Common cause: matplotlib.backends.backend_pdf not bundled in the
-        # frozen .exe.  Warn once and continue with the PNG only.
-        print(f"AVISO: no se pudo guardar el PDF '{pdf_path}' "
-              f"(continuamos con el PNG): {exc}")
-        return ""
-    return pdf_path
+    result = ""
+    if _OUTPUT_PDF:
+        try:
+            fig.savefig(pdf_path)
+            result = pdf_path
+        except (ImportError, ModuleNotFoundError, ValueError) as exc:
+            # Common cause: matplotlib.backends.backend_pdf not bundled in
+            # the frozen .exe.  Warn once and continue with the PNG only.
+            print(f"AVISO: no se pudo guardar el PDF '{pdf_path}' "
+                  f"(continuamos con el PNG): {exc}")
+    # Release the figure.  compute_and_save() creates ~8 figures per run
+    # and the GUI keeps the same process alive across repeated "Calculate"
+    # clicks; without this, matplotlib's global registry accumulates
+    # Figure objects until it warns ("More than 20 figures...") and memory
+    # grows over a long session.  Every caller only prints after this
+    # returns and never touches ``fig`` again, so closing here is safe.
+    plt.close(fig)
+    return result
 
 try:
     from scipy.optimize import differential_evolution
@@ -284,841 +275,27 @@ except ImportError:
 
 
 # --------------------------------------------------------------------------- #
-#  Inputs (cm).  Edit the numbers in main() to match your situation.
+#  Geometry, profiles and searches (split into sibling modules)
 # --------------------------------------------------------------------------- #
-@dataclass(frozen=True)
-class Car:
-    """
-    Car geometry, all in cm.
-
-    `front_overhang` is the horizontal distance from the front axle to
-    the lowest point of the FRONT of the car (front lip / spoiler / valance).
-    Set to 0 if your front bumper is appreciably higher than the underbody
-    and not at risk of scraping.
-
-    `rear_overhang` is the same for the rear.  In most cars the rear
-    bumper sits higher than the underbody and is not at risk, so the
-    default is 0.  Increase it if you want to check rear-bumper drag
-    when the car climbs out of the garage.
-    """
-    clearance: float        # underbody-to-ground on flat
-    wheelbase: float        # front-axle to rear-axle
-    front_overhang: float = 0.0
-    rear_overhang: float = 0.0
-
-
-@dataclass(frozen=True)
-class Ramp:
-    rise: float  # vertical change of the slope
-    run: float   # horizontal length of the slope
-
-
-# --------------------------------------------------------------------------- #
-#  Profile generators
-# --------------------------------------------------------------------------- #
-def linear_profile(ramp: Ramp, n: int = 2000):
-    x = np.linspace(0.0, ramp.run, n)
-    y = ramp.rise * x / ramp.run
-    return x, y
-
-
-def three_segment_profile(
-    ramp: Ramp, theta: float, r_top_frac: float, n: int = 2000
-):
-    """
-    Bottom concave-up arc + straight middle + top concave-down arc.
-    All segments are tangent at their joins.
-
-    Closure:
-        S * sin(theta) + L_m * cos(theta) = run
-        S * (1 - cos(theta)) + L_m * sin(theta) = rise
-    where S = R_bottom + R_top.  Solving for S and L_m:
-        S   = (run * sin(theta) - rise * cos(theta)) / (1 - cos(theta))
-        L_m = (rise * sin(theta) - run * (1 - cos(theta))) / (1 - cos(theta))
-    """
-    sin_t, cos_t = math.sin(theta), math.cos(theta)
-    omc = 1.0 - cos_t
-    if omc < 1e-9:
-        return linear_profile(ramp, n)
-
-    sum_r = (ramp.run * sin_t - ramp.rise * cos_t) / omc
-    L_m = (ramp.rise * sin_t - ramp.run * omc) / omc
-    if sum_r < -1e-6 or L_m < -1e-6:
-        raise ValueError(f"theta={math.degrees(theta):.2f} deg out of range")
-    sum_r = max(0.0, sum_r)
-    L_m = max(0.0, L_m)
-
-    r_top = sum_r * r_top_frac
-    r_bot = sum_r - r_top
-
-    # Distribute samples by arc length / segment length.
-    arc_b = r_bot * theta
-    arc_t = r_top * theta
-    total_len = arc_b + L_m + arc_t
-    if total_len < 1e-9:
-        return linear_profile(ramp, n)
-    n_b = max(2, int(round(n * arc_b / total_len)))
-    n_m = max(2, int(round(n * L_m / total_len))) if L_m > 1e-6 else 0
-    n_t = max(2, n - n_b - n_m)
-
-    # Bottom arc: centre (0, r_bot), tangent horizontal at the start.
-    s_b = np.linspace(0.0, theta, n_b)
-    x_b = r_bot * np.sin(s_b)
-    y_b = r_bot * (1.0 - np.cos(s_b))
-
-    x_b_end = float(x_b[-1])
-    y_b_end = float(y_b[-1])
-
-    # Straight middle (skip its first point to avoid duplication).
-    if n_m > 0:
-        s_m = np.linspace(0.0, L_m, n_m + 1)[1:]
-        x_m = x_b_end + s_m * cos_t
-        y_m = y_b_end + s_m * sin_t
-        x_m_end = float(x_m[-1])
-        y_m_end = float(y_m[-1])
-    else:
-        x_m = np.empty(0)
-        y_m = np.empty(0)
-        x_m_end = x_b_end
-        y_m_end = y_b_end
-
-    # Top arc: centre offset r_top to the right and below the join along
-    # the inward normal (sin theta, -cos theta).
-    cx = x_m_end + r_top * sin_t
-    cy = y_m_end - r_top * cos_t
-    a = np.linspace(math.pi / 2 + theta, math.pi / 2, n_t + 1)[1:]
-    x_t = cx + r_top * np.cos(a)
-    y_t = cy + r_top * np.sin(a)
-
-    x = np.concatenate([x_b, x_m, x_t])
-    y = np.concatenate([y_b, y_m, y_t])
-    # Snap endpoints to exact target.
-    x[0], y[0] = 0.0, 0.0
-    x[-1], y[-1] = ramp.run, ramp.rise
-    return x, y
-
-
-# --------------------------------------------------------------------------- #
-#  N-slope (piecewise-linear) profile with small smoothing fillets
-# --------------------------------------------------------------------------- #
-def n_slope_profile(
-    ramp: Ramp,
-    breakpoints,           # list of (xi, yi) interior break points
-    fillet: float = 30.0,
-    n: int = 2400,
-):
-    """
-    Piecewise-linear profile through (0, 0), the interior breakpoints,
-    and (run, rise), with a circular fillet of the given radius at every
-    kink (start, each interior breakpoint, end).
-    """
-    pts = [(0.0, 0.0)] + [(float(x), float(y)) for x, y in breakpoints] + \
-          [(ramp.run, ramp.rise)]
-
-    # Validate monotonicity in x and y.
-    for i in range(len(pts) - 1):
-        if pts[i + 1][0] <= pts[i][0] + 1e-6:
-            raise ValueError(f"x not increasing at index {i}")
-        if pts[i + 1][1] < pts[i][1] - 1e-6:
-            raise ValueError(f"y not non-decreasing at index {i}")
-
-    pre = (-200.0, 0.0)
-    post = (ramp.run + 200.0, ramp.rise)
-
-    def fillet_arc(p_prev, p_corner, p_next, r):
-        v1 = np.array(p_corner) - np.array(p_prev)
-        v2 = np.array(p_next) - np.array(p_corner)
-        L1 = float(np.linalg.norm(v1))
-        L2 = float(np.linalg.norm(v2))
-        if L1 < 1e-9 or L2 < 1e-9:
-            return [p_corner]
-        u1 = v1 / L1
-        u2 = v2 / L2
-        cos_phi = float(np.clip(np.dot(u1, u2), -1.0, 1.0))
-        phi = math.acos(cos_phi)
-        if phi < 1e-6:
-            return [p_corner]
-        t = r / math.tan((math.pi - phi) / 2.0)
-        t = min(t, 0.45 * L1, 0.45 * L2)
-        if t < 1e-6:
-            return [p_corner]
-        a = np.array(p_corner) - u1 * t
-        b = np.array(p_corner) + u2 * t
-        nrm1 = np.array([-u1[1], u1[0]])
-        if np.dot(nrm1, u2) < 0:
-            nrm1 = -nrm1
-        r_eff = t * math.tan((math.pi - phi) / 2.0)
-        c = a + nrm1 * r_eff
-        ang_a = math.atan2(a[1] - c[1], a[0] - c[0])
-        ang_b = math.atan2(b[1] - c[1], b[0] - c[0])
-        d = ang_b - ang_a
-        while d > math.pi:
-            d -= 2 * math.pi
-        while d < -math.pi:
-            d += 2 * math.pi
-        m = max(8, int(40 * abs(d) / math.pi))
-        ts = np.linspace(0.0, 1.0, m)
-        ang = ang_a + d * ts
-        return [(c[0] + r_eff * math.cos(t_), c[1] + r_eff * math.sin(t_))
-                for t_ in ang]
-
-    path = [pts[0]]
-    # Fillet at start (between virtual pre and pts[1]).
-    path += fillet_arc(pre, pts[0], pts[1], fillet)
-    for i in range(1, len(pts) - 1):
-        path += [pts[i]]
-        path += fillet_arc(pts[i - 1], pts[i], pts[i + 1], fillet)
-    path += [pts[-1]]
-    # Fillet at end (between pts[-2] and virtual post).
-    path += fillet_arc(pts[-2], pts[-1], post, fillet)
-
-    arr = np.array(path)
-    order = np.argsort(arr[:, 0])
-    arr = arr[order]
-    keep = np.concatenate([[True], np.diff(arr[:, 0]) > 1e-6])
-    arr = arr[keep]
-    xs = np.linspace(0.0, ramp.run, n)
-    ys = np.interp(xs, arr[:, 0], arr[:, 1])
-    return xs, ys
-
-
-def search_n_slope(
-    ramp: Ramp, car: Car, n_segments: int,
-    fillet: float = 30.0,
-    de_maxiter: int = 35, de_popsize: int = 12, seed: int = 7,
-):
-    """
-    Differential-evolution search over the (n_segments - 1) interior
-    breakpoints of an n-slope profile.  Each breakpoint contributes
-    (x, y) coordinates, so 2 * (n_segments - 1) free parameters.
-    """
-    if not HAS_SCIPY:
-        raise RuntimeError("scipy is required for the n-slope search")
-
-    K = n_segments - 1                        # number of interior breakpoints
-    grade = ramp.rise / ramp.run
-
-    # Search bounds: x_i in (0, run), y_i in (0, rise).  We let the
-    # objective enforce ordering and monotonicity via a heavy penalty.
-    bounds = []
-    for k in range(K):
-        # Spread initial bounds roughly evenly along the slope to give the
-        # optimiser a sensible starting region.
-        x_lo = 0.05 * ramp.run + (k / K) * 0.10 * ramp.run
-        x_hi = (k + 1) / K * ramp.run + 0.10 * ramp.run
-        x_hi = min(x_hi, 0.95 * ramp.run)
-        bounds.append((x_lo, x_hi))
-    for k in range(K):
-        y_lo = 0.05 * ramp.rise + (k / K) * 0.10 * ramp.rise
-        y_hi = (k + 1) / K * ramp.rise + 0.10 * ramp.rise
-        y_hi = min(y_hi, 0.97 * ramp.rise)
-        bounds.append((y_lo, y_hi))
-
-    def unpack(params):
-        xs_int = np.asarray(params[:K], dtype=float)
-        ys_int = np.asarray(params[K:], dtype=float)
-        # Sort both, so the optimiser can never produce out-of-order
-        # breakpoints (this is an extra safety net on top of the bounds).
-        xs_int = np.sort(xs_int)
-        ys_int = np.sort(ys_int)
-        # Make sure breakpoints are reasonably spaced apart in x.
-        for i in range(1, K):
-            if xs_int[i] - xs_int[i - 1] < 30:
-                xs_int[i] = xs_int[i - 1] + 30
-        # Reject if last x is past the slope, or last y past the top.
-        if xs_int[-1] > ramp.run - 30 or ys_int[-1] > ramp.rise - 0.5:
-            return None
-        return list(zip(xs_int, ys_int))
-
-    def objective(params):
-        breaks = unpack(params)
-        if breaks is None:
-            return 1e3
-        try:
-            xp, yp = n_slope_profile(ramp, breaks, fillet=fillet, n=600)
-        except ValueError:
-            return 1e3
-        try:
-            m = evaluate(xp, yp, car, ramp,
-                         n_positions=400, n_chassis=100, pad=300)
-        except Exception:
-            return 1e3
-        score = min(m["chassis_min"], m["overhang_min"])
-        return -score
-
-    # Use the legacy RandomState here -- the existing seed (7) was tuned
-    # against scipy's default RandomState behaviour, and switching to
-    # ``default_rng`` shifts the RNG stream onto a different PCG64
-    # sequence, which lands DE in a worse 4-slope optimum for the typical
-    # garage geometry.  Passing the RandomState explicitly also avoids
-    # the scipy 1.15+ deprecation warning attached to ``seed=int``.
-    result = differential_evolution(
-        objective, bounds,
-        maxiter=de_maxiter, popsize=de_popsize,
-        seed=np.random.RandomState(seed),
-        tol=1e-3, mutation=(0.4, 1.2), recombination=0.85,
-        polish=True, workers=1, updating="deferred",
-    )
-
-    breaks = unpack(result.x)
-    if breaks is None:
-        raise RuntimeError(f"{n_segments}-slope search failed to converge")
-    xp, yp = n_slope_profile(ramp, breaks, fillet=fillet, n=1500)
-    m = evaluate(xp, yp, car, ramp, n_positions=3000, n_chassis=400)
-    out = dict(
-        n_segments=n_segments,
-        breaks=breaks,
-        fillet=fillet,
-        x=xp, y=yp,
-        score=min(m["chassis_min"], m["overhang_min"]),
-        **m,
-    )
-    # Slope angles for reporting.
-    pts = [(0.0, 0.0)] + list(breaks) + [(ramp.run, ramp.rise)]
-    out["segments"] = []
-    for i in range(len(pts) - 1):
-        xa, ya = pts[i]
-        xb, yb = pts[i + 1]
-        dx, dy = xb - xa, yb - ya
-        out["segments"].append(dict(
-            i=i + 1,
-            x_a=xa, y_a=ya, x_b=xb, y_b=yb,
-            angle_deg=math.degrees(math.atan2(dy, dx)),
-            percent=100.0 * dy / dx,
-            length=math.hypot(dx, dy),
-        ))
-    return out
-
-
-# --------------------------------------------------------------------------- #
-#  Free-form smooth profile (monotone cubic spline)
-# --------------------------------------------------------------------------- #
-def smooth_profile(
-    ramp: Ramp,
-    interior_x_frac, interior_y_frac,
-    n: int = 2400,
-):
-    """
-    Smooth profile defined by K interior control points at fractional
-    positions along x in (0, 1) and fractional y in (0, 1).  Endpoints
-    are pinned to (0, 0) and (run, rise).  PCHIP gives a monotone cubic
-    interpolation (no overshoot, no spurious wiggles).
-    """
-    if not HAS_SCIPY:
-        raise RuntimeError("scipy is required for the smooth profile")
-
-    xs_int = np.asarray(interior_x_frac, dtype=float) * ramp.run
-    ys_int = np.asarray(interior_y_frac, dtype=float) * ramp.rise
-    order = np.argsort(xs_int)
-    xs_int = xs_int[order]
-    ys_int = ys_int[order]
-    # Force monotone non-decreasing in y as well.
-    ys_int = np.maximum.accumulate(ys_int)
-
-    xs_ctrl = np.concatenate([[0.0], xs_int, [ramp.run]])
-    ys_ctrl = np.concatenate([[0.0], ys_int, [ramp.rise]])
-
-    # Deduplicate close-by xs_ctrl entries.
-    keep = np.concatenate([[True], np.diff(xs_ctrl) > 1e-6])
-    xs_ctrl = xs_ctrl[keep]
-    ys_ctrl = ys_ctrl[keep]
-
-    pchip = PchipInterpolator(xs_ctrl, ys_ctrl, extrapolate=False)
-    xs = np.linspace(0.0, ramp.run, n)
-    ys = np.asarray(pchip(xs))
-    # Numerical safety: clamp tiny excursions and force endpoints exact.
-    ys = np.maximum.accumulate(ys)
-    ys[0] = 0.0
-    ys[-1] = ramp.rise
-    return xs, ys, xs_ctrl, ys_ctrl
-
-
-def search_smooth(
-    ramp: Ramp, car: Car,
-    K: int = 5,                  # number of interior control points
-    de_maxiter: int = 50, de_popsize: int = 14, seed: int = 11,
-):
-    """
-    Optimise the K interior control points of a monotone cubic-spline
-    profile.  Each control point contributes (x_frac, y_frac) in (0, 1).
-    """
-    if not HAS_SCIPY:
-        raise RuntimeError("scipy is required for the smooth-profile search")
-
-    # Seed the optimiser with a roughly S-shaped start (concave-up bottom,
-    # concave-down top), which is what we expect the answer to look like.
-    bounds_x = [(k / (K + 1) - 0.5 / (K + 1),
-                 k / (K + 1) + 0.5 / (K + 1))
-                for k in range(1, K + 1)]
-    bounds_y = [(0.001, 0.999) for _ in range(K)]
-    bounds = bounds_x + bounds_y
-
-    def objective(params):
-        xfs = np.asarray(params[:K])
-        yfs = np.asarray(params[K:])
-        try:
-            xp, yp, _, _ = smooth_profile(ramp, xfs, yfs, n=600)
-        except Exception:
-            return 1e3
-        try:
-            m = evaluate(xp, yp, car, ramp,
-                         n_positions=400, n_chassis=100, pad=300)
-        except Exception:
-            return 1e3
-        score = min(m["chassis_min"], m["overhang_min"])
-        return -score
-
-    # Use modern PCG64 via ``default_rng`` for the smooth search -- it
-    # samples the design space differently from the legacy MT19937 and
-    # in our geometry it consistently finds a better (less-scratching)
-    # PCHIP optimum.  Passing a Generator explicitly also pins the RNG
-    # stream, so consecutive runs of the same input cannot land on
-    # different control points.
-    result = differential_evolution(
-        objective, bounds,
-        maxiter=de_maxiter, popsize=de_popsize,
-        seed=np.random.default_rng(seed),
-        tol=1e-3, mutation=(0.4, 1.3), recombination=0.85,
-        polish=True, workers=1, updating="deferred",
-    )
-
-    xfs = np.asarray(result.x[:K])
-    yfs = np.asarray(result.x[K:])
-    xp, yp, xs_ctrl, ys_ctrl = smooth_profile(ramp, xfs, yfs, n=2400)
-    m = evaluate(xp, yp, car, ramp, n_positions=3000, n_chassis=400)
-    out = dict(
-        K=K,
-        xs_ctrl=xs_ctrl, ys_ctrl=ys_ctrl,
-        x=xp, y=yp,
-        score=min(m["chassis_min"], m["overhang_min"]),
-        **m,
-    )
-    return out
-
-
-# --------------------------------------------------------------------------- #
-#  Three-slope (piecewise-linear) profile with small smoothing fillets
-# --------------------------------------------------------------------------- #
-def three_slope_profile(
-    ramp: Ramp,
-    x1: float, y1: float,   # break point between slope 1 and slope 2
-    x2: float, y2: float,   # break point between slope 2 and slope 3
-    fillet: float = 30.0,   # radius of the small rounding at every kink
-    n: int = 2400,
-):
-    """
-    Three straight slopes joined by small circular fillets at every
-    kink (start, between slope 1 and 2, between 2 and 3, end).
-
-    Constraints checked:
-        0 < x1 < x2 < run
-        0 < y1 < y2 < rise
-    The slopes increase monotonically; typically the design has a
-    gentle bottom slope, a steep middle slope, and a gentle top slope.
-    """
-    if not (0 < x1 < x2 < ramp.run):
-        raise ValueError("require 0 < x1 < x2 < run")
-    if not (0 < y1 < y2 < ramp.rise):
-        raise ValueError("require 0 < y1 < y2 < rise")
-
-    # Slope angles of the three straight sections.
-    a0 = 0.0
-    a1 = math.atan2(y1, x1)
-    a2 = math.atan2(y2 - y1, x2 - x1)
-    a3 = math.atan2(ramp.rise - y2, ramp.run - x2)
-    a4 = 0.0
-
-    if not (a1 < a2 and a2 > a3):
-        # Not the classic gentle-steep-gentle shape; allow it but warn.
-        pass
-
-    pts = [(0.0, 0.0)]
-
-    def fillet_arc(p_prev, p_corner, p_next, r):
-        """
-        Insert a tangent arc at p_corner that smoothly joins the line
-        p_prev->p_corner with the line p_corner->p_next.
-        """
-        v1 = np.array(p_corner) - np.array(p_prev)
-        v2 = np.array(p_next) - np.array(p_corner)
-        L1 = float(np.linalg.norm(v1))
-        L2 = float(np.linalg.norm(v2))
-        if L1 < 1e-9 or L2 < 1e-9:
-            return [p_corner]
-        u1 = v1 / L1
-        u2 = v2 / L2
-        # Half angle between the two tangent directions.
-        cos_phi = float(np.clip(np.dot(u1, u2), -1.0, 1.0))
-        phi = math.acos(cos_phi)          # external angle change
-        if phi < 1e-6:
-            return [p_corner]
-        t = r / math.tan((math.pi - phi) / 2.0)  # tangent offset from corner
-        t = min(t, 0.45 * L1, 0.45 * L2)
-        if t < 1e-6:
-            return [p_corner]
-        a = np.array(p_corner) - u1 * t   # arc start (on incoming line)
-        b = np.array(p_corner) + u2 * t   # arc end   (on outgoing line)
-        # Centre is perpendicular to u1 from a, on the inside of the turn.
-        # The inside is the side that the outgoing direction turns toward.
-        nrm1 = np.array([-u1[1], u1[0]])
-        # Pick the normal that points toward u2.
-        if np.dot(nrm1, u2) < 0:
-            nrm1 = -nrm1
-        # Effective radius from geometry (tangent length t, half angle (pi-phi)/2)
-        r_eff = t * math.tan((math.pi - phi) / 2.0)
-        c = a + nrm1 * r_eff
-        # Sweep from a to b around c.
-        ang_a = math.atan2(a[1] - c[1], a[0] - c[0])
-        ang_b = math.atan2(b[1] - c[1], b[0] - c[0])
-        # Take the short way around.
-        d = ang_b - ang_a
-        while d > math.pi:
-            d -= 2 * math.pi
-        while d < -math.pi:
-            d += 2 * math.pi
-        m = max(8, int(40 * abs(d) / math.pi))
-        ts = np.linspace(0.0, 1.0, m)
-        ang = ang_a + d * ts
-        arc = [(c[0] + r_eff * math.cos(t_), c[1] + r_eff * math.sin(t_))
-               for t_ in ang]
-        return arc
-
-    # We build the path: virtual point well to the left (flat), origin,
-    # corner1 = (x1, y1), corner2 = (x2, y2), top = (run, rise), virtual
-    # right point well past the top.
-    pre = (-200.0, 0.0)
-    p0 = (0.0, 0.0)
-    p1 = (x1, y1)
-    p2 = (x2, y2)
-    p3 = (ramp.run, ramp.rise)
-    post = (ramp.run + 200.0, ramp.rise)
-
-    path = [p0]
-    path += fillet_arc(pre, p0, p1, fillet)
-    path += [p1]
-    path += fillet_arc(p0, p1, p2, fillet)
-    path += [p2]
-    path += fillet_arc(p1, p2, p3, fillet)
-    path += [p3]
-    path += fillet_arc(p2, p3, post, fillet)
-
-    # Sort by x and dedupe.
-    arr = np.array(path)
-    order = np.argsort(arr[:, 0])
-    arr = arr[order]
-    keep = np.concatenate([[True], np.diff(arr[:, 0]) > 1e-6])
-    arr = arr[keep]
-    # Resample uniformly.
-    xs = np.linspace(0.0, ramp.run, n)
-    ys = np.interp(xs, arr[:, 0], arr[:, 1])
-    return xs, ys
-
-
-def three_slope_keypoints(ramp: Ramp, x1: float, y1: float,
-                          x2: float, y2: float, fillet: float):
-    """
-    Compute the labeled keypoints of the 3-slope profile (kink corners
-    and the start/end of each fillet arc), so a worker can mark them
-    on the ground.  Returns a list of (label, x, y, kind) tuples in
-    increasing x order, where kind is "kink" or "fillet".
-    """
-    pre = (-200.0, 0.0)
-    p0 = (0.0, 0.0)
-    p1 = (x1, y1)
-    p2 = (x2, y2)
-    p3 = (ramp.run, ramp.rise)
-    post = (ramp.run + 200.0, ramp.rise)
-
-    def fillet_endpoints(p_prev, p_corner, p_next, r):
-        v1 = np.array(p_corner) - np.array(p_prev)
-        v2 = np.array(p_next) - np.array(p_corner)
-        L1 = float(np.linalg.norm(v1))
-        L2 = float(np.linalg.norm(v2))
-        if L1 < 1e-9 or L2 < 1e-9:
-            return None
-        u1 = v1 / L1
-        u2 = v2 / L2
-        cos_phi = float(np.clip(np.dot(u1, u2), -1.0, 1.0))
-        phi = math.acos(cos_phi)
-        if phi < 1e-6:
-            return None
-        t = r / math.tan((math.pi - phi) / 2.0)
-        t = min(t, 0.45 * L1, 0.45 * L2)
-        if t < 1e-6:
-            return None
-        a = np.array(p_corner) - u1 * t
-        b = np.array(p_corner) + u2 * t
-        r_eff = t * math.tan((math.pi - phi) / 2.0)
-        return (float(a[0]), float(a[1])), (float(b[0]), float(b[1])), r_eff
-
-    pts = []
-    # Esquina en p0 (inicio de la rampa, sobre el suelo del garaje).
-    f = fillet_endpoints(pre, p0, p1, fillet)
-    pts.append((t("Start of the ramp (corner)"), p0[0], p0[1], "kink", None))
-    if f is not None:
-        pts.append((t("End of the start fillet"), f[1][0], f[1][1], "fillet", f[2]))
-
-    # Esquina entre el tramo 1 y el tramo 2.
-    f = fillet_endpoints(p0, p1, p2, fillet)
-    if f is not None:
-        pts.append((t("Start of fillet before kink 1"), f[0][0], f[0][1], "fillet", f[2]))
-    pts.append((t("Kink 1 (theoretical corner)"), p1[0], p1[1], "kink", None))
-    if f is not None:
-        pts.append((t("End of fillet after kink 1"), f[1][0], f[1][1], "fillet", f[2]))
-
-    # Esquina entre el tramo 2 y el tramo 3.
-    f = fillet_endpoints(p1, p2, p3, fillet)
-    if f is not None:
-        pts.append((t("Start of fillet before kink 2"), f[0][0], f[0][1], "fillet", f[2]))
-    pts.append((t("Kink 2 (theoretical corner)"), p2[0], p2[1], "kink", None))
-    if f is not None:
-        pts.append((t("End of fillet after kink 2"), f[1][0], f[1][1], "fillet", f[2]))
-
-    # Esquina superior (final de la rampa sobre la calle).
-    f = fillet_endpoints(p2, p3, post, fillet)
-    if f is not None:
-        pts.append((t("Start of fillet at the top"), f[0][0], f[0][1], "fillet", f[2]))
-    pts.append((t("End of the ramp (corner)"), p3[0], p3[1], "kink", None))
-
-    return pts
-
-
-def search_three_slope(ramp: Ramp, car: Car, n_grid: int = 11,
-                       fillet: float = 30.0) -> dict:
-    """
-    Search the four-parameter space (x1, y1, x2, y2) for the best
-    three-slope profile.  Coarse grid + refinement.
-    """
-    grade = ramp.rise / ramp.run
-
-    def grid_search(x1_lo, x1_hi, y1_lo, y1_hi,
-                    x2_lo, x2_hi, y2_lo, y2_hi, n):
-        best_local = None
-        for x1 in np.linspace(x1_lo, x1_hi, n):
-            for x2 in np.linspace(max(x1 + 30, x2_lo), x2_hi, n):
-                if x2 <= x1 + 30:
-                    continue
-                for y1 in np.linspace(y1_lo, y1_hi, n):
-                    if y1 / x1 >= grade:    # bottom slope must be gentler than mean
-                        continue
-                    for y2 in np.linspace(max(y1 + 5, y2_lo), y2_hi, n):
-                        if y2 <= y1:
-                            continue
-                        if (ramp.rise - y2) / (ramp.run - x2) >= grade:
-                            continue        # top slope must be gentler than mean
-                        try:
-                            x, y = three_slope_profile(
-                                ramp, x1, y1, x2, y2, fillet=fillet, n=1200
-                            )
-                        except ValueError:
-                            continue
-                        m = evaluate(x, y, car, ramp,
-                                     n_positions=900, n_chassis=180)
-                        sc = min(m["chassis_min"], m["overhang_min"])
-                        if best_local is None or sc > best_local["score"]:
-                            best_local = dict(
-                                x1=x1, y1=y1, x2=x2, y2=y2,
-                                fillet=fillet, score=sc, x=x, y=y, **m,
-                            )
-        return best_local
-
-    # Coarse pass.
-    best = grid_search(
-        0.10 * ramp.run, 0.45 * ramp.run,
-        0.5,             0.30 * ramp.rise,
-        0.55 * ramp.run, 0.92 * ramp.run,
-        0.55 * ramp.rise, 0.97 * ramp.rise,
-        n_grid,
-    )
-    if best is None:
-        raise RuntimeError("three-slope search failed")
-
-    # Refine around the best point.
-    dx = ramp.run / n_grid
-    dy = ramp.rise / n_grid
-    refined = grid_search(
-        max(20.0, best["x1"] - dx),  best["x1"] + dx,
-        max(0.5,  best["y1"] - dy),  best["y1"] + dy,
-        max(best["x1"] + 40, best["x2"] - dx), min(ramp.run - 20.0, best["x2"] + dx),
-        max(best["y1"] + 5, best["y2"] - dy), min(ramp.rise - 0.5, best["y2"] + dy),
-        max(7, n_grid // 2 + 1),
-    )
-    if refined and refined["score"] > best["score"]:
-        best = refined
-
-    # Final high-resolution evaluation.
-    final = evaluate(best["x"], best["y"], car, ramp,
-                     n_positions=3000, n_chassis=400)
-    best.update(final)
-    best["score"] = min(best["chassis_min"], best["overhang_min"])
-    # Slope angles for reporting.
-    best["slope1_deg"] = math.degrees(math.atan2(best["y1"], best["x1"]))
-    best["slope2_deg"] = math.degrees(math.atan2(
-        best["y2"] - best["y1"], best["x2"] - best["x1"]
-    ))
-    best["slope3_deg"] = math.degrees(math.atan2(
-        ramp.rise - best["y2"], ramp.run - best["x2"]
-    ))
-    return best
-
-
-# --------------------------------------------------------------------------- #
-#  Drive simulation
-# --------------------------------------------------------------------------- #
-def evaluate(x_p, y_p, car: Car, ramp: Ramp, pad: float = 400.0,
-             n_positions: int = 1500, n_chassis: int = 250):
-    """
-    Slide the car along the profile (extended with flat sections before
-    and after) and return the worst clearance under the chassis between
-    the wheels (high-centering) and under the overhangs (bumpers).
-    """
-    x_pre = np.linspace(-pad, 0.0, 200, endpoint=False)
-    y_pre = np.zeros_like(x_pre)
-    x_post = np.linspace(ramp.run, ramp.run + pad, 200)[1:]
-    y_post = np.full_like(x_post, ramp.rise)
-
-    x_road = np.concatenate([x_pre, x_p, x_post])
-    y_road = np.concatenate([y_pre, y_p, y_post])
-    order = np.argsort(x_road)
-    x_road, y_road = x_road[order], y_road[order]
-    keep = np.concatenate([[True], np.diff(x_road) > 1e-9])
-    x_road, y_road = x_road[keep], y_road[keep]
-
-    rear_xs = np.linspace(
-        x_road[0] + 1.0, x_road[-1] - car.wheelbase - 1.0, n_positions
-    )
-
-    chassis_min = math.inf
-    chassis_at = chassis_pos = None
-    overhang_min = math.inf
-    overhang_at = overhang_pos = None
-
-    for x_rear in rear_xs:
-        x_front = x_rear + car.wheelbase
-        h_rear = float(np.interp(x_rear, x_road, y_road))
-        h_front = float(np.interp(x_front, x_road, y_road))
-
-        x_pts = np.linspace(
-            x_rear - car.rear_overhang,
-            x_front + car.front_overhang,
-            n_chassis,
-        )
-        t = (x_pts - x_rear) / car.wheelbase
-        chassis_y = h_rear + t * (h_front - h_rear) + car.clearance
-        road_y = np.interp(x_pts, x_road, y_road)
-        clr = chassis_y - road_y
-
-        between = (x_pts >= x_rear) & (x_pts <= x_front)
-        if between.any():
-            i = int(np.argmin(clr[between]))
-            v = float(clr[between][i])
-            if v < chassis_min:
-                chassis_min = v
-                chassis_at = float(x_pts[between][i])
-                chassis_pos = float(x_rear)
-
-        out = ~between
-        if out.any():
-            i = int(np.argmin(clr[out]))
-            v = float(clr[out][i])
-            if v < overhang_min:
-                overhang_min = v
-                overhang_at = float(x_pts[out][i])
-                overhang_pos = float(x_rear)
-
-    return dict(
-        chassis_min=chassis_min,
-        chassis_at_x=chassis_at,
-        chassis_at_rear=chassis_pos,
-        overhang_min=overhang_min,
-        overhang_at_x=overhang_at,
-        overhang_at_rear=overhang_pos,
-    )
-
-
-# --------------------------------------------------------------------------- #
-#  Search the (theta, R_top fraction) design space
-# --------------------------------------------------------------------------- #
-def search(ramp: Ramp, car: Car, n_theta: int = 25, n_frac: int = 25,
-           refine: int = 9, min_r_top: float | None = None):
-    theta_lo = math.atan(ramp.rise / ramp.run)        # linear ramp limit
-    theta_hi = 2.0 * math.atan(ramp.rise / ramp.run)  # zero straight middle
-
-    # Hard-floor R_top so the crest never collapses to a near-kink.  The
-    # high-centering sagitta of a wheelbase-length chord on a circle of
-    # radius R is W^2 / (8R); setting R_top >= W^2 / (8C) makes that
-    # sagitta no worse than the ground clearance.  We default to that
-    # value so the optimiser is forced to produce a genuinely flat crest.
-    if min_r_top is None:
-        min_r_top = (car.wheelbase ** 2) / (8.0 * car.clearance)
-
-    def coarse_search(t_lo, t_hi, f_lo, f_hi, nt, nf):
-        best_local = None
-        for theta in np.linspace(t_lo, t_hi, nt):
-            for frac in np.linspace(f_lo, f_hi, nf):
-                try:
-                    x, y = three_segment_profile(ramp, theta, frac, n=1200)
-                except ValueError:
-                    continue
-                # Reject splits where R_top is below the high-centering
-                # floor -- they look "good" only because they trade a
-                # crest scrape for a mid-slope scrape.
-                sin_t, omc = math.sin(theta), 1.0 - math.cos(theta)
-                if omc < 1e-9:
-                    continue
-                sum_r = (ramp.run * sin_t - ramp.rise * math.cos(theta)) / omc
-                r_top = sum_r * frac
-                if r_top < min_r_top:
-                    continue
-                m = evaluate(x, y, car, ramp, n_positions=1000, n_chassis=200)
-                score = min(m["chassis_min"], m["overhang_min"])
-                if best_local is None or score > best_local["score"]:
-                    best_local = dict(
-                        theta=theta, theta_deg=math.degrees(theta),
-                        r_top_frac=frac, score=score, x=x, y=y, **m,
-                    )
-        return best_local
-
-    # Stage 1: coarse grid.
-    best = coarse_search(
-        theta_lo + 1e-4, theta_hi - 1e-4, 0.05, 0.98, n_theta, n_frac
-    )
-    if best is None:
-        raise RuntimeError("search failed")
-
-    # Stage 2: refine around the best point.
-    dt = (theta_hi - theta_lo) / n_theta
-    df = 0.93 / n_frac
-    refined = coarse_search(
-        max(theta_lo + 1e-4, best["theta"] - dt),
-        min(theta_hi - 1e-4, best["theta"] + dt),
-        max(0.05, best["r_top_frac"] - df),
-        min(0.98, best["r_top_frac"] + df),
-        refine, refine,
-    )
-    if refined and refined["score"] > best["score"]:
-        best = refined
-
-    # Recompute geometry numbers for reporting.
-    sin_t, cos_t = math.sin(best["theta"]), math.cos(best["theta"])
-    omc = 1.0 - cos_t
-    sum_r = (ramp.run * sin_t - ramp.rise * cos_t) / omc
-    L_m = (ramp.rise * sin_t - ramp.run * omc) / omc
-    best["sum_r"] = sum_r
-    best["L_m"] = max(0.0, L_m)
-    best["r_top"] = sum_r * best["r_top_frac"]
-    best["r_bot"] = sum_r - best["r_top"]
-    best["x_b_end"] = best["r_bot"] * sin_t
-    best["y_b_end"] = best["r_bot"] * omc
-    best["x_m_end"] = best["x_b_end"] + best["L_m"] * cos_t
-    best["y_m_end"] = best["y_b_end"] + best["L_m"] * sin_t
-
-    # Evaluate at high resolution on the chosen profile.
-    final = evaluate(best["x"], best["y"], car, ramp,
-                     n_positions=3000, n_chassis=400)
-    best.update(final)
-    best["score"] = min(best["chassis_min"], best["overhang_min"])
-    return best
+# Geometry, profile generators and searches were split into sibling
+# modules; re-export them so ``ramp_optimizer.X`` keeps working for the
+# GUI, the tests and any external callers.
+from ramp_model import Car, Ramp  # noqa: E402,F401
+from ramp_profiles import (  # noqa: E402,F401
+    linear_profile,
+    n_slope_profile,
+    smooth_profile,
+    three_segment_profile,
+    three_slope_keypoints,
+    three_slope_profile,
+)
+from ramp_search import (  # noqa: E402,F401
+    evaluate,
+    search,
+    search_n_slope,
+    search_smooth,
+    search_three_slope,
+)
 
 
 # --------------------------------------------------------------------------- #
@@ -1465,7 +642,7 @@ def draw_three_slope_blueprint_topref(
     )
 
     # Table.
-    ax_table = fig.add_axes([0.05, 0.03, 0.92, 0.26])
+    ax_table = fig.add_axes((0.05, 0.03, 0.92, 0.26))
     ax_table.set_axis_off()
     cell_text = []
     for letter, name, ui, di, kind, r in table_rows:
@@ -1510,6 +687,7 @@ def draw_three_slope_blueprint_topref(
     pdf_path = _save_fig(fig, path)
     print(t("Construction blueprint (top reference) saved to {path} "
             "(+ PDF: {pdf})").format(path=path, pdf=pdf_path))
+    return fig
 
 
 def _draw_topref_chrome(
@@ -1660,7 +838,7 @@ def _draw_topref_chrome(
 
 def _topref_table(fig, table_rows, n_cols: int = 5):
     """Place the measurements table at the bottom of the figure."""
-    ax_table = fig.add_axes([0.05, 0.03, 0.92, 0.26])
+    ax_table = fig.add_axes((0.05, 0.03, 0.92, 0.26))
     ax_table.set_axis_off()
     table = ax_table.table(
         cellText=[row[:n_cols] for row in table_rows[1:]],
@@ -1676,10 +854,15 @@ def _topref_table(fig, table_rows, n_cols: int = 5):
         cell = table[(0, c)]
         cell.set_text_props(fontweight="bold")
         cell.set_facecolor("#e6e6e6")
+    # The last tuple element carries the (already-translated) row type;
+    # compare against the translated "corner" label rather than a
+    # hard-coded Spanish literal, otherwise the green corner highlight
+    # never fires in the default English build.
+    corner_label = t("corner")
     for r_idx, row in enumerate(table_rows[1:], start=1):
         kind = row[-1] if len(row) > n_cols else ""
         for c in range(n_cols):
-            if "esquina" in str(kind):
+            if corner_label in str(kind):
                 table[(r_idx, c)].set_facecolor("#eaf6ea")
             else:
                 table[(r_idx, c)].set_facecolor("#fff8e0")
@@ -1823,6 +1006,7 @@ def draw_piecewise_blueprint_topref(
     pdf_path = _save_fig(fig, path)
     print(t("Construction blueprint saved to {path} (+ PDF: {pdf})"
             ).format(path=path, pdf=pdf_path))
+    return fig
 
 
 def draw_smooth_blueprint_topref(
@@ -1951,7 +1135,7 @@ def draw_smooth_blueprint_topref(
     # blueprints that still use the helper.
     col_labels = list(table_rows[0])
     rows = list(table_rows[1:])
-    ax_table = fig.add_axes([0.05, 0.02, 0.92, 0.36])
+    ax_table = fig.add_axes((0.05, 0.02, 0.92, 0.36))
     ax_table.set_axis_off()
     table = ax_table.table(
         cellText=rows, colLabels=col_labels,
@@ -1983,6 +1167,7 @@ def draw_smooth_blueprint_topref(
     pdf_path = _save_fig(fig, path)
     print(t("Construction blueprint saved to {path} (+ PDF: {pdf})"
             ).format(path=path, pdf=pdf_path))
+    return fig
 
 
 def chord_coords(ramp: Ramp, x_arr, y_arr):
@@ -2191,7 +1376,7 @@ def draw_smooth_blueprint_groundref(
             kind = t("intermediate station")
         rows.append((str(n), f"{xi:7.1f}", f"{yi:7.1f}", kind))
 
-    ax_table = fig.add_axes([0.05, 0.02, 0.92, 0.36])
+    ax_table = fig.add_axes((0.05, 0.02, 0.92, 0.36))
     ax_table.set_axis_off()
     table = ax_table.table(
         cellText=rows, colLabels=col_labels,
@@ -2214,6 +1399,7 @@ def draw_smooth_blueprint_groundref(
     pdf_path = _save_fig(fig, path)
     print(t("Construction blueprint saved to {path} (+ PDF: {pdf})"
             ).format(path=path, pdf=pdf_path))
+    return fig
 
 
 def draw_chord_blueprint(
@@ -2488,7 +1674,7 @@ def draw_chord_blueprint(
     # Bottom: measurements table, placed well below the working drawing
     # (the gridspec ends at y=0.42, so the table fits in the lower 36%
     # of the figure without overlapping the plot area).
-    ax_table = fig.add_axes([0.05, 0.02, 0.92, 0.36])
+    ax_table = fig.add_axes((0.05, 0.02, 0.92, 0.36))
     ax_table.set_axis_off()
     if is_smooth:
         col_labels = [
@@ -2552,6 +1738,7 @@ def draw_chord_blueprint(
     pdf_path = _save_fig(fig, path)
     print(t("Construction blueprint (cord reference) saved to {path} "
             "(+ PDF: {pdf})").format(path=path, pdf=pdf_path))
+    return fig
 
 
 def draw_three_slope_blueprint(ramp: Ramp, best3: dict, path: str = "ramp_blueprint.png"):
@@ -2728,7 +1915,7 @@ def draw_three_slope_blueprint(ramp: Ramp, best3: dict, path: str = "ramp_bluepr
     )
 
     # ----  Measurements table in its own axes below the drawing.  ---- #
-    ax_table = fig.add_axes([0.05, 0.03, 0.92, 0.26])
+    ax_table = fig.add_axes((0.05, 0.03, 0.92, 0.26))
     ax_table.set_axis_off()
     cell_text = []
     for letter, name, xi, yi, kind, r in table_rows:
@@ -2762,6 +1949,7 @@ def draw_three_slope_blueprint(ramp: Ramp, best3: dict, path: str = "ramp_bluepr
     pdf_path = _save_fig(fig, path)
     print(t("Construction blueprint saved to {path} (+ PDF: {pdf})"
             ).format(path=path, pdf=pdf_path))
+    return fig
 
 
 def write_offsets(path, x, y, n=28):
@@ -2801,7 +1989,11 @@ def concrete_volume_m3(x_curve, y_curve, ramp_width_cm: float) -> float:
     order = np.argsort(x)
     x = x[order]
     y = y[order]
-    area_cm2 = float(np.trapz(np.maximum(y, 0.0), x))
+    # np.trapz was renamed np.trapezoid in NumPy 2.0 (the old name is
+    # deprecated and will eventually be removed); prefer the new name and
+    # fall back on older NumPy.  requirements.txt has no NumPy upper bound.
+    _trapezoid = getattr(np, "trapezoid", None) or np.trapz
+    area_cm2 = float(_trapezoid(np.maximum(y, 0.0), x))
     return area_cm2 * ramp_width_cm / 1_000_000.0
 
 
@@ -2822,17 +2014,42 @@ def fmt_currency(value: float, symbol: str = "EUR") -> str:
 def sensitivity(car: Car, base_ramp: Ramp, runs):
     """For a list of candidate runs, optimise the ramp and report the
     worst-case clearance.  Useful when you can extend the slope into
-    the garage or street area."""
-    rows = []
-    for run in runs:
-        ramp = Ramp(rise=base_ramp.rise, run=run)
-        try:
-            best = search(ramp, car, n_theta=18, n_frac=18, refine=7)
-            rows.append((run, best["chassis_min"], best["overhang_min"],
-                         best["score"]))
-        except Exception as e:  # pragma: no cover
-            rows.append((run, float("nan"), float("nan"), float("nan")))
-    return rows
+    the garage or street area.
+
+    The candidate runs are independent searches, so they run in parallel
+    across processes; results are returned in the original ``runs`` order.
+    """
+    runs = list(runs)
+    if not runs:
+        return []
+
+    def _nan_row(run, err):
+        # Surface why a candidate run failed instead of leaving a silent
+        # NaN row — a bare NaN hides both bad geometry and genuine
+        # regressions (e.g. a scipy behaviour change).
+        print(t("  (sensitivity: run {run:.0f} cm failed: {err})").format(
+            run=run, err=err), file=sys.stderr)
+        return (run, float("nan"), float("nan"), float("nan"))
+
+    results: dict = {}
+    max_workers = min(len(runs), os.cpu_count() or 1)
+    with ProcessPoolExecutor(max_workers=max_workers) as pool:
+        fut_to_idx = {
+            pool.submit(search, Ramp(rise=base_ramp.rise, run=run), car,
+                        n_theta=18, n_frac=18, refine=7): i
+            for i, run in enumerate(runs)
+        }
+        for fut in as_completed(fut_to_idx):
+            i = fut_to_idx[fut]
+            run = runs[i]
+            try:
+                best = fut.result()
+                results[i] = (run, best["chassis_min"],
+                              best["overhang_min"], best["score"])
+            except Exception as e:  # pragma: no cover  # noqa: BLE001
+                results[i] = _nan_row(run, e)
+
+    return [results[i] for i in range(len(runs))]
 
 
 def _ask_float(prompt: str, default: float | None = None,
@@ -3039,6 +2256,20 @@ def parse_inputs() -> tuple["Ramp", "Car", float, float, str,
         print(t("ERROR: rise and run must be positive."), file=sys.stderr)
         raise SystemExit(2)
 
+    # Car parameters are only prompted (and floored) in the interactive
+    # branch above.  When rise/run are supplied on the command line that
+    # branch is skipped, so re-validate here: clearance == 0 raises a raw
+    # ZeroDivisionError deep inside search(), and wheelbase == 0 silently
+    # produces inf/nan "no scrape" results instead of a clear error.
+    if args.clearance <= 0 or args.wheelbase <= 0:
+        print(t("ERROR: ground clearance and wheelbase must be positive."),
+              file=sys.stderr)
+        raise SystemExit(2)
+    if args.front_overhang < 0 or args.rear_overhang < 0:
+        print(t("ERROR: front and rear overhang cannot be negative."),
+              file=sys.stderr)
+        raise SystemExit(2)
+
     if args.desnivel >= args.longitud:
         print(
             t("WARNING: rise is greater than or equal to run. The mean "
@@ -3144,7 +2375,10 @@ def compute_and_save(
     # flags let the caller skip an entire profile -- handy when, for
     # instance, the 3-slope geometry consistently scores worse than
     # the 4-slope on the user's specific ramp dimensions.
-    parallel_jobs = []
+    # Heterogeneous (key, search-fn, args) jobs; the search fns and their
+    # arg tuples differ in shape, so annotate loosely to keep mypy quiet.
+    from typing import Any, Callable
+    parallel_jobs: list[tuple[str, Callable[..., Any], tuple]] = []
     if enable_2arc:
         parallel_jobs.append(("arc", search, (ramp, car)))
     if enable_3slope:
@@ -3180,8 +2414,18 @@ def compute_and_save(
             }
             for fut in as_completed(future_to_key):
                 key = future_to_key[fut]
-                results[key] = fut.result()
-                print(t("  ... {name}: done.").format(name=job_label[key]))
+                try:
+                    results[key] = fut.result()
+                    print(t("  ... {name}: done.").format(
+                        name=job_label[key]))
+                except Exception as exc:  # noqa: BLE001
+                    # One profile's search failing (e.g. an over-constrained
+                    # geometry that never converges) must not discard the
+                    # profiles that did succeed.  Report it and carry on;
+                    # downstream code already guards each result with
+                    # ``results.get(key) is not None``.
+                    print(t("  ... {name}: FAILED ({err})").format(
+                        name=job_label[key], err=exc))
     print()
 
     best = results.get("arc")
@@ -3328,16 +2572,16 @@ def compute_and_save(
 
         # CSVs (s, p) for the two profiles, in the cord reference.
         for profile_name, x_arr, y_arr, fname in [
-            ("4 tramos", best4["x"], best4["y"],
+            ("4 slopes", best4["x"], best4["y"],
              _output_name("csv_4slope_chord", ".csv")),
-            ("suave", best_smooth["x"], best_smooth["y"],
+            ("smooth", best_smooth["x"], best_smooth["y"],
              _output_name("csv_smooth_chord", ".csv")),
         ]:
             s_arr, p_arr = chord_coords(ramp, x_arr, y_arr)
             order = np.argsort(s_arr)
             s_arr = s_arr[order]
             p_arr = p_arr[order]
-            n_rows = 28 if profile_name == "4 tramos" else 40
+            n_rows = 28 if profile_name == "4 slopes" else 40
             ss_out = np.linspace(0.0, s_arr[-1], n_rows)
             ps_out = np.interp(ss_out, s_arr, p_arr)
             if _OUTPUT_CSV:
@@ -3386,8 +2630,7 @@ def compute_and_save(
     print("\n" + t("Comparison summary (worst scrape, in cm; positive = "
                     "no scrape):"))
     head_perfil = "profile" if LANGUAGE == "en" else "perfil"
-    head_bajo = t("    bajo").lstrip().rjust(8) if LANGUAGE == "es" \
-        else "chassis".rjust(8)
+    head_bajo = ("bajo" if LANGUAGE == "es" else "chassis").rjust(8)
     head_bumper = "bumper".rjust(9)
     head_score = "worst".rjust(8)
     if LANGUAGE == "es":
@@ -3548,7 +2791,7 @@ def compute_and_save(
                 min_clr[i] = float(np.min(chassis_y - road_y))
             return rear_xs, min_clr
 
-        profiles = [
+        profiles: list = [
             (t("Linear ramp (current geometry)"),
              x_lin, y_lin, "tab:red", res_lin, []),
         ]
