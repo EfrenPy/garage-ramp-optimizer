@@ -59,6 +59,16 @@ jobs:
               -e 's|docs/sample_wall_smooth.png|sample_wall_smooth.png|g' \
               -e 's|docs/gui_screenshot.png|gui_screenshot.png|g' \
               docs/index.md
+          # Cross-references are written relative to the repo root so they
+          # resolve on GitHub; rewrite them for the MkDocs site, where
+          # docs/ is the root and README.md is published as index.md, so
+          # `mkdocs build --strict` does not abort on them.  SIGNPATH.md
+          # already lives under docs/, so it just needs the docs/ prefix
+          # dropped.
+          sed -i -e 's|docs/SIGNPATH.md|SIGNPATH.md|g' \
+              docs/index.md docs/COMPILAR.md docs/CONTRIBUTING.md
+          sed -i -e 's|README.md#|index.md#|g' \
+              docs/index.md docs/COMPILAR.md docs/CONTRIBUTING.md
 
       - name: Build site
         run: mkdocs build --strict
