@@ -263,17 +263,24 @@ def _save_fig(fig, png_path: str, dpi: int = 130) -> str:
         pdf_path = pdf_path[:-4] + ".pdf"
     else:
         pdf_path = pdf_path + ".pdf"
-    if not _OUTPUT_PDF:
-        return ""
-    try:
-        fig.savefig(pdf_path)
-    except (ImportError, ModuleNotFoundError, ValueError) as exc:
-        # Common cause: matplotlib.backends.backend_pdf not bundled in the
-        # frozen .exe.  Warn once and continue with the PNG only.
-        print(f"AVISO: no se pudo guardar el PDF '{pdf_path}' "
-              f"(continuamos con el PNG): {exc}")
-        return ""
-    return pdf_path
+    result = ""
+    if _OUTPUT_PDF:
+        try:
+            fig.savefig(pdf_path)
+            result = pdf_path
+        except (ImportError, ModuleNotFoundError, ValueError) as exc:
+            # Common cause: matplotlib.backends.backend_pdf not bundled in
+            # the frozen .exe.  Warn once and continue with the PNG only.
+            print(f"AVISO: no se pudo guardar el PDF '{pdf_path}' "
+                  f"(continuamos con el PNG): {exc}")
+    # Release the figure.  compute_and_save() creates ~8 figures per run
+    # and the GUI keeps the same process alive across repeated "Calculate"
+    # clicks; without this, matplotlib's global registry accumulates
+    # Figure objects until it warns ("More than 20 figures...") and memory
+    # grows over a long session.  Every caller only prints after this
+    # returns and never touches ``fig`` again, so closing here is safe.
+    plt.close(fig)
+    return result
 
 try:
     from scipy.optimize import differential_evolution
@@ -728,9 +735,10 @@ def three_slope_profile(
     a3 = math.atan2(ramp.rise - y2, ramp.run - x2)
     a4 = 0.0
 
-    if not (a1 < a2 and a2 > a3):
-        # Not the classic gentle-steep-gentle shape; allow it but warn.
-        pass
+    # Note: the gentle-steep-gentle shape (a1 < a2 > a3) is not enforced
+    # here on purpose — the caller (search_three_slope) already constrains
+    # the grid to that family, and callers that build ad-hoc profiles are
+    # allowed any monotone shape.
 
     pts = [(0.0, 0.0)]
 
@@ -1676,10 +1684,15 @@ def _topref_table(fig, table_rows, n_cols: int = 5):
         cell = table[(0, c)]
         cell.set_text_props(fontweight="bold")
         cell.set_facecolor("#e6e6e6")
+    # The last tuple element carries the (already-translated) row type;
+    # compare against the translated "corner" label rather than a
+    # hard-coded Spanish literal, otherwise the green corner highlight
+    # never fires in the default English build.
+    corner_label = t("corner")
     for r_idx, row in enumerate(table_rows[1:], start=1):
         kind = row[-1] if len(row) > n_cols else ""
         for c in range(n_cols):
-            if "esquina" in str(kind):
+            if corner_label in str(kind):
                 table[(r_idx, c)].set_facecolor("#eaf6ea")
             else:
                 table[(r_idx, c)].set_facecolor("#fff8e0")
@@ -2801,7 +2814,11 @@ def concrete_volume_m3(x_curve, y_curve, ramp_width_cm: float) -> float:
     order = np.argsort(x)
     x = x[order]
     y = y[order]
-    area_cm2 = float(np.trapz(np.maximum(y, 0.0), x))
+    # np.trapz was renamed np.trapezoid in NumPy 2.0 (the old name is
+    # deprecated and will eventually be removed); prefer the new name and
+    # fall back on older NumPy.  requirements.txt has no NumPy upper bound.
+    _trapezoid = getattr(np, "trapezoid", None) or np.trapz
+    area_cm2 = float(_trapezoid(np.maximum(y, 0.0), x))
     return area_cm2 * ramp_width_cm / 1_000_000.0
 
 
@@ -2830,7 +2847,12 @@ def sensitivity(car: Car, base_ramp: Ramp, runs):
             best = search(ramp, car, n_theta=18, n_frac=18, refine=7)
             rows.append((run, best["chassis_min"], best["overhang_min"],
                          best["score"]))
-        except Exception as e:  # pragma: no cover
+        except Exception as e:  # pragma: no cover  # noqa: BLE001
+            # Surface why a candidate run failed instead of leaving a
+            # silent NaN row — a bare NaN hides both bad geometry and
+            # genuine regressions (e.g. a scipy behaviour change).
+            print(t("  (sensitivity: run {run:.0f} cm failed: {err})").format(
+                run=run, err=e), file=sys.stderr)
             rows.append((run, float("nan"), float("nan"), float("nan")))
     return rows
 
@@ -3039,6 +3061,20 @@ def parse_inputs() -> tuple["Ramp", "Car", float, float, str,
         print(t("ERROR: rise and run must be positive."), file=sys.stderr)
         raise SystemExit(2)
 
+    # Car parameters are only prompted (and floored) in the interactive
+    # branch above.  When rise/run are supplied on the command line that
+    # branch is skipped, so re-validate here: clearance == 0 raises a raw
+    # ZeroDivisionError deep inside search(), and wheelbase == 0 silently
+    # produces inf/nan "no scrape" results instead of a clear error.
+    if args.clearance <= 0 or args.wheelbase <= 0:
+        print(t("ERROR: ground clearance and wheelbase must be positive."),
+              file=sys.stderr)
+        raise SystemExit(2)
+    if args.front_overhang < 0 or args.rear_overhang < 0:
+        print(t("ERROR: front and rear overhang cannot be negative."),
+              file=sys.stderr)
+        raise SystemExit(2)
+
     if args.desnivel >= args.longitud:
         print(
             t("WARNING: rise is greater than or equal to run. The mean "
@@ -3180,8 +3216,18 @@ def compute_and_save(
             }
             for fut in as_completed(future_to_key):
                 key = future_to_key[fut]
-                results[key] = fut.result()
-                print(t("  ... {name}: done.").format(name=job_label[key]))
+                try:
+                    results[key] = fut.result()
+                    print(t("  ... {name}: done.").format(
+                        name=job_label[key]))
+                except Exception as exc:  # noqa: BLE001
+                    # One profile's search failing (e.g. an over-constrained
+                    # geometry that never converges) must not discard the
+                    # profiles that did succeed.  Report it and carry on;
+                    # downstream code already guards each result with
+                    # ``results.get(key) is not None``.
+                    print(t("  ... {name}: FAILED ({err})").format(
+                        name=job_label[key], err=exc))
     print()
 
     best = results.get("arc")
@@ -3328,16 +3374,16 @@ def compute_and_save(
 
         # CSVs (s, p) for the two profiles, in the cord reference.
         for profile_name, x_arr, y_arr, fname in [
-            ("4 tramos", best4["x"], best4["y"],
+            ("4 slopes", best4["x"], best4["y"],
              _output_name("csv_4slope_chord", ".csv")),
-            ("suave", best_smooth["x"], best_smooth["y"],
+            ("smooth", best_smooth["x"], best_smooth["y"],
              _output_name("csv_smooth_chord", ".csv")),
         ]:
             s_arr, p_arr = chord_coords(ramp, x_arr, y_arr)
             order = np.argsort(s_arr)
             s_arr = s_arr[order]
             p_arr = p_arr[order]
-            n_rows = 28 if profile_name == "4 tramos" else 40
+            n_rows = 28 if profile_name == "4 slopes" else 40
             ss_out = np.linspace(0.0, s_arr[-1], n_rows)
             ps_out = np.interp(ss_out, s_arr, p_arr)
             if _OUTPUT_CSV:

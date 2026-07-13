@@ -24,6 +24,9 @@ _lang_es.flag
 /comparativa_rampas.png
 /comparativa_rampas.pdf
 /cotas*.csv
+# Snapshot dumps of a full run (e.g. output_v0.4.1, output_v0.4.2_es).
+# Regenerated on demand; never commit them.
+/output_*/
 
 # Python caches
 __pycache__/

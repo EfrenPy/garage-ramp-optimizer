@@ -93,6 +93,10 @@ _TRANSLATIONS_ES: "dict[str, str]" = {
     # Validation / error messages (CLI).
     "ERROR: rise and run must be positive.":
         "ERROR: el desnivel y la longitud deben ser positivos.",
+    "ERROR: ground clearance and wheelbase must be positive.":
+        "ERROR: la altura libre y la batalla deben ser positivas.",
+    "ERROR: front and rear overhang cannot be negative.":
+        "ERROR: los voladizos delantero y trasero no pueden ser negativos.",
     "WARNING: rise is greater than or equal to run. The mean grade would be >= 100 % (45 degrees or more), which is not realistic for a car.":
         "AVISO: el desnivel es mayor o igual que la longitud. La rampa tendria una pendiente media >= 100 % (45 grados o mas), que no es realista para un coche.",
 
@@ -212,6 +216,8 @@ _TRANSLATIONS_ES: "dict[str, str]" = {
         "Con la longitud actual, no se puede evitar del todo el roce.",
     "Sensitivity if the ramp is lengthened (rise stays at {rise:.0f} cm):":
         "Sensibilidad si se alarga la rampa (desnivel sigue siendo {rise:.0f} cm):",
+    "  (sensitivity: run {run:.0f} cm failed: {err})":
+        "  (sensibilidad: la longitud {run:.0f} cm fallo: {err})",
     "  (chassis = worst between-wheels clearance;":
         "  (bajo     = peor holgura del bajo entre ruedas;",
     "   bumper  = worst front-overhang / bumper clearance;":
@@ -262,6 +268,7 @@ _TRANSLATIONS_ES: "dict[str, str]" = {
 
     # Key-points printed table headers.
     "  pt":    "  pt",
+    "pt":      "pt",
     "what":    "que es",
     "x (cm)":  "x (cm)",
     "y (cm)":  "y (cm)",
@@ -345,6 +352,8 @@ _TRANSLATIONS_ES: "dict[str, str]" = {
     "y (cm) original":   "y (cm) original",
     "Construction blueprint (reference: straight cord T -> B) - {label}  (cord = {L:.2f} cm, rise {rise:.0f} cm, run {run:.0f} cm)":
         "Plano de construccion (referencia: cuerda recta T -> B) - {label}  (cuerda = {L:.2f} cm, desnivel {rise:.0f} cm, longitud {run:.0f} cm)",
+    "Construction blueprint - {label}  (rise {rise:.0f} cm, run {run:.0f} cm, stations every {step:.0f} cm)":
+        "Plano de construccion - {label}  (desnivel {rise:.0f} cm, longitud {run:.0f} cm, estaciones cada {step:.0f} cm)",
 
     # Comparison plot.
     "Height (cm)":               "Altura (cm)",
@@ -587,6 +596,8 @@ _TRANSLATIONS_ES: "dict[str, str]" = {
         "ninguno -- solo se mostrara la rampa lineal de referencia",
     "  ... {name}: done.":
         "  ... {name}: listo.",
+    "  ... {name}: FAILED ({err})":
+        "  ... {name}: FALLO ({err})",
     "two arcs + straight":
         "dos arcos + recta",
     "three slopes":

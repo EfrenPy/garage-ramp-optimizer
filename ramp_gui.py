@@ -558,7 +558,11 @@ def launch_gui() -> None:
          88, t("Generating top-reference 3-slope blueprint...")),
         (_output_name("blueprint_3slope_top", ".png"),
          90, t("Computing sensitivity to ramp length...")),
-        (_trig("Sensitivity if the ramp is lengthened"),
+        # Match on the translated prefix of the real (placeholder-bearing)
+        # log line; the bare English prefix was not a dict key and so never
+        # matched the Spanish log line, skipping this stage in Spanish.
+        (t("Sensitivity if the ramp is lengthened (rise stays at "
+           "{rise:.0f} cm):").split("{")[0],
          92, t("Computing sensitivity to ramp length...")),
         (_output_name("blueprint_compare", ".png"),
          100, t("Done. Blueprints and CSVs generated.")),
@@ -567,14 +571,23 @@ def launch_gui() -> None:
     # Parallel-search completion triggers (any order, each fires once).
     # We bump the bar by a fixed amount per completion so the user gets
     # incremental feedback during the long parallel block.
+    # Build each trigger from the SAME translated template the optimiser
+    # emits (``t("  ... {name}: done.")``) so the substring match works in
+    # every language.  Concatenating an untranslated literal ": done." onto
+    # a translated name broke matching in Spanish, where the emitted line
+    # ends in ": listo." and the bar stalled at 5 % through the whole
+    # parallel-search block.
+    def _done_trig(name_key: str) -> str:
+        return t("  ... {name}: done.").format(name=t(name_key))
+
     parallel_done_triggers = [
-        ("  ... " + t("two arcs + straight") + ": done.",
+        (_done_trig("two arcs + straight"),
          t("two arcs + straight: done.  Waiting for the rest...")),
-        ("  ... " + t("three slopes") + ": done.",
+        (_done_trig("three slopes"),
          t("three slopes: done.  Waiting for the rest...")),
-        ("  ... " + t("four slopes") + ": done.",
+        (_done_trig("four slopes"),
          t("four slopes: done.  Waiting for the rest...")),
-        ("  ... " + t("free-form smooth (PCHIP)") + ": done.",
+        (_done_trig("free-form smooth (PCHIP)"),
          t("free-form smooth (PCHIP): done.")),
     ]
     parallel_done_remaining = list(parallel_done_triggers)
@@ -766,6 +779,26 @@ def launch_gui() -> None:
             )
             return
 
+        # Validate the method / output-format selections BEFORE we touch
+        # any UI state.  Doing this after disabling the button (and
+        # starting the elapsed timer) below would soft-lock the GUI: the
+        # early ``return`` would leave the Calculate button disabled and
+        # the timer ticking forever, with no worker thread ever started.
+        if not (enable_2arc_var.get() or enable_3slope_var.get()
+                or enable_4slope_var.get() or enable_smooth_var.get()):
+            messagebox.showerror(
+                t("Invalid data"),
+                t("Pick at least one profile to optimise."),
+            )
+            return
+        if not (output_pdf_var.get() or output_png_var.get()
+                or output_csv_var.get()):
+            messagebox.showerror(
+                t("Invalid data"),
+                t("Pick at least one output format (PDF / PNG / CSV)."),
+            )
+            return
+
         car = Car(clearance=altura, wheelbase=batalla,
                   front_overhang=voladizo_d, rear_overhang=voladizo_t)
         ramp = Ramp(rise=desnivel, run=longitud)
@@ -784,23 +817,10 @@ def launch_gui() -> None:
         start_time[0] = time.time()
         root.after(1000, _tick_elapsed)
 
-        # Snapshot the method checkboxes at click time so the worker
-        # gets a stable view (the user may toggle while it runs).
-        if not (enable_2arc_var.get() or enable_3slope_var.get()
-                or enable_4slope_var.get() or enable_smooth_var.get()):
-            messagebox.showerror(
-                t("Invalid data"),
-                t("Pick at least one profile to optimise."),
-            )
-            return
-        if not (output_pdf_var.get() or output_png_var.get()
-                or output_csv_var.get()):
-            messagebox.showerror(
-                t("Invalid data"),
-                t("Pick at least one output format (PDF / PNG / CSV)."),
-            )
-            return
-
+        # The method / output-format selections were snapshotted and
+        # validated above (before the button was disabled).  Reading the
+        # checkbox vars again here is safe: the worker gets a stable view
+        # even if the user toggles a box while it runs.
         thread = threading.Thread(
             target=_worker,
             args=(ramp, car, out_dir, ramp_width_v, cost_v, currency_v,
