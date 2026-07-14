@@ -15,6 +15,12 @@ updates:
     commit-message:
       prefix: "deps"
       include: "scope"
+    # Bundle every pip update into a single PR so a weekly run produces
+    # one notification instead of one-per-dependency.
+    groups:
+      python-dependencies:
+        patterns:
+          - "*"
 
   # Keep GitHub Actions versions up to date.
   - package-ecosystem: "github-actions"
@@ -31,3 +37,10 @@ updates:
     commit-message:
       prefix: "ci"
       include: "scope"
+    # Bundle every GitHub Actions bump into a single PR.  This is what
+    # previously caused the email flood: ~9 separate action bumps each
+    # opened their own PR and each failing check emailed individually.
+    groups:
+      github-actions:
+        patterns:
+          - "*"
